@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Altitude Project | Mountain Miner</title>
+  <meta name="description" content="Altitude Project ecosystem on Base. Deflationary tokenomics, USDC rewards, and Mountain Miner DeFi miner dapp." />
+  <link rel="preconnect" href="https://api.geckoterminal.com" />
+  <link rel="preconnect" href="https://mainnet.base.org" />
+  <style>
+    :root {
+      --bg: #030814;
+      --bg-2: #06152c;
+      --panel: rgba(8, 22, 45, 0.72);
+      --panel-2: rgba(6, 14, 30, 0.88);
+      --line: rgba(47, 215, 255, 0.22);
+      --cyan: #27d7ff;
+      --blue: #0b84ff;
+      --text: #f5fbff;
+      --muted: #9fb8ca;
+      --danger: #ff6b8a;
+      --success: #6bf7c1;
+      --warning: #ffd166;
+      --radius: 28px;
+      --shadow: 0 0 48px rgba(23, 171, 255, 0.18);
+      --max: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 75% 10%, rgba(0, 140, 255, 0.22), transparent 34rem),
+        radial-gradient(circle at 20% 20%, rgba(39, 215, 255, 0.11), transparent 26rem),
+        linear-gradient(180deg, #02050d 0%, var(--bg) 42%, #02050d 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(39, 215, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(39, 215, 255, 0.035) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: linear-gradient(to bottom, black, transparent 85%);
+      z-index: -1;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+
+    .wrap { width: min(var(--max), calc(100% - 32px)); margin: 0 auto; }
+    .glass {
+      background: linear-gradient(180deg, rgba(11, 25, 53, 0.82), rgba(5, 13, 28, 0.74));
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      border-radius: var(--radius);
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: rgba(2, 5, 13, 0.72);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(39, 215, 255, 0.14);
+    }
+
+    .nav {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+    .brand img { width: 42px; height: 42px; border-radius: 999px; box-shadow: 0 0 22px rgba(39, 215, 255, 0.35); }
+    .navlinks { display: flex; align-items: center; gap: 22px; color: var(--muted); font-weight: 700; font-size: 0.9rem; }
+    .navlinks a:hover { color: var(--cyan); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      min-height: 46px; padding: 0 18px;
+      border: 1px solid rgba(39, 215, 255, 0.35);
+      background: linear-gradient(135deg, rgba(39, 215, 255, 0.18), rgba(11, 132, 255, 0.26));
+      color: white; border-radius: 999px; font-weight: 900; letter-spacing: 0.02em;
+      box-shadow: 0 0 24px rgba(39, 215, 255, 0.18);
+    }
+    .btn.secondary { background: rgba(255,255,255,0.045); color: var(--text); }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(39, 215, 255, 0.72); }
+
+    .hero { padding: 56px 0 22px; position: relative; }
+    .hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: center; }
+    .eyebrow { color: var(--cyan); text-transform: uppercase; letter-spacing: 0.22em; font-weight: 900; font-size: 0.78rem; }
+    h1 { margin: 18px 0 16px; font-size: clamp(3rem, 7vw, 6.4rem); line-height: 0.92; letter-spacing: -0.07em; text-transform: uppercase; }
+    h1 span { display: block; color: var(--cyan); text-shadow: 0 0 28px rgba(39, 215, 255, 0.45); }
+    .lead { color: #c7d8e8; font-size: clamp(1.05rem, 2vw, 1.28rem); line-height: 1.65; max-width: 650px; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+    .hero-card { padding: 14px; overflow: hidden; }
+    .hero-card img { border-radius: 22px; border: 1px solid rgba(39, 215, 255, 0.18); box-shadow: 0 0 60px rgba(39, 215, 255, 0.14); }
+
+    .stats { padding: 24px 0 34px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .stat { padding: 20px; min-height: 128px; }
+    .stat .label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 900; font-size: 0.72rem; }
+    .stat .value { margin-top: 12px; font-size: clamp(1.35rem, 2.4vw, 2rem); font-weight: 950; letter-spacing: -0.04em; }
+    .stat .sub { margin-top: 8px; color: var(--muted); font-size: 0.9rem; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 999px; box-shadow: 0 0 14px var(--success); margin-right: 8px; }
+
+    section { padding: 48px 0; }
+    .section-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 20px; }
+    h2 { margin: 0; font-size: clamp(2rem, 4vw, 3.2rem); letter-spacing: -0.055em; text-transform: uppercase; }
+    .section-head p { max-width: 560px; color: var(--muted); line-height: 1.6; margin: 0; }
+
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { padding: 24px; }
+    .icon {
+      width: 48px; height: 48px; display: grid; place-items: center;
+      border-radius: 16px; border: 1px solid rgba(39, 215, 255, 0.28);
+      background: rgba(39, 215, 255, 0.08); color: var(--cyan); font-size: 1.35rem;
+      box-shadow: inset 0 0 18px rgba(39, 215, 255, 0.08);
+    }
+    .card h3 { margin: 18px 0 10px; font-size: 1.18rem; }
+    .card p { margin: 0; color: var(--muted); line-height: 1.65; }
+
+    .miner { display: grid; grid-template-columns: 0.95fr 1.05fr; gap: 18px; align-items: center; }
+    .miner .panel { padding: 28px; }
+    .mini-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; }
+    .mini { padding: 16px; border-radius: 18px; background: rgba(255,255,255,0.035); border: 1px solid rgba(39, 215, 255, 0.14); }
+    .mini strong { display: block; font-size: 1.1rem; }
+    .mini span { color: var(--muted); font-size: 0.9rem; }
+
+    .token-address {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px 16px; border-radius: 18px; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(39, 215, 255, 0.16); color: #cfeeff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere; margin-top: 20px;
+    }
+    .copy { cursor: pointer; border: 0; color: var(--cyan); background: transparent; font-weight: 900; }
+
+    footer { padding: 42px 0; color: var(--muted); border-top: 1px solid rgba(39, 215, 255, 0.12); }
+    .risk { color: #d9a9b6; font-size: 0.92rem; line-height: 1.6; margin-top: 18px; }
+
+    @media (max-width: 900px) {
+      .navlinks { display: none; }
+      .hero-grid, .miner { grid-template-columns: 1fr; }
+      .stat-grid, .cards { grid-template-columns: repeat(2, 1fr); }
+      .section-head { display: block; }
+      .section-head p { margin-top: 10px; }
+    }
+
+    @media (max-width: 560px) {
+      .stat-grid, .cards, .mini-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 3rem; }
+      .brand span { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav class="wrap nav">
+      <a class="brand" href="#">
+        <img src="assets/altitude-logo.jpg" alt="Altitude logo">
+        <span>Altitude</span>
+      </a>
+      <div class="navlinks">
+        <a href="#stats">Live Stats</a>
+        <a href="#altitude">Altitude</a>
+        <a href="#miner">Mountain Miner</a>
+        <a href="#docs">Docs</a>
+      </div>
+      <a class="btn" href="#miner">Launch Dapp</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <div class="eyebrow">Altitude Project Ecosystem</div>
+          <h1>Join the <span>Ascent</span></h1>
+          <p class="lead">
+            A Base-chain DeFi ecosystem built around deflationary tokenomics, transparent project revenue,
+            USDC reward flows, and the Mountain Miner DeFi miner dapp.
+          </p>
+          <div class="hero-actions">
+            <a class="btn" href="#stats">View Live Stats</a>
+            <a class="btn secondary" href="#docs">Read GitBook</a>
+          </div>
+          <div class="token-address" title="Altitude contract address">
+            <span id="tokenAddress">0x90678C02823b21772fa7e91B27EE70490257567B</span>
+            <button class="copy" type="button" onclick="copyToken()">Copy</button>
+          </div>
+        </div>
+
+        <div class="hero-card glass">
+          <img src="assets/mountain-miner-banner.png" alt="Mountain Miner banner">
+        </div>
+      </div>
+    </section>
+
+    <section id="stats" class="stats">
+      <div class="wrap stat-grid">
+        <div class="stat glass">
+          <div class="label"><span class="status-dot"></span>Altitude Price</div>
+          <div class="value" id="priceUsd">Loading…</div>
+          <div class="sub" id="priceSource">Fetching from GeckoTerminal / Dexscreener</div>
+        </div>
+        <div class="stat glass">
+          <div class="label">Current Supply</div>
+          <div class="value" id="totalSupply">Loading…</div>
+          <div class="sub">Read from Base RPC totalSupply()</div>
+        </div>
+        <div class="stat glass">
+          <div class="label">Tokens Burned</div>
+          <div class="value" id="tokensBurned">Loading…</div>
+          <div class="sub">210,000,000 - current total supply</div>
+        </div>
+        <div class="stat glass">
+          <div class="label">Burn Progress</div>
+          <div class="value" id="burnPercent">Loading…</div>
+          <div class="sub">Against 210,000,000 starting supply</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="altitude">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Altitude Token</h2>
+          <p>
+            The core ecosystem token. The website tracks live market price and burn progress automatically,
+            replacing manual Wix updates with on-chain reads and public market data APIs.
+          </p>
+        </div>
+        <div class="cards">
+          <article class="card glass">
+            <div class="icon">⛰</div>
+            <h3>Deflationary Supply</h3>
+            <p>Burned tokens are calculated as the difference between the 210M start supply and the current token total supply.</p>
+          </article>
+          <article class="card glass">
+            <div class="icon">$</div>
+            <h3>USDC Reward Focus</h3>
+            <p>Position the project around transparent USDC-based value flows, holder rewards, treasury growth, and sustainable revenue use.</p>
+          </article>
+          <article class="card glass">
+            <div class="icon">↗</div>
+            <h3>Ecosystem Growth</h3>
+            <p>Use the site as a cleaner launchpad for Docs, the miner dapp, token stats, liquidity links, and future revenue pages.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="miner">
+      <div class="wrap miner">
+        <div class="hero-card glass">
+          <img src="assets/mountain-miner-logo.png" alt="Mountain Miner logo">
+        </div>
+        <div class="panel glass">
+          <div class="eyebrow">DeFi Miner Dapp</div>
+          <h2>Mountain Miner</h2>
+          <p class="lead">
+            A simple ROI-style miner experience for the Altitude ecosystem: deposit USDC, track daily ROI,
+            claim rewards, and understand the 3X maximum payout before depositing.
+          </p>
+          <div class="mini-grid">
+            <div class="mini"><strong>Deposit USDC</strong><span>Simple USDC entry</span></div>
+            <div class="mini"><strong>0.5-1% Daily</strong><span>Configurable ROI range</span></div>
+            <div class="mini"><strong>Claim Rewards</strong><span>User-controlled payout</span></div>
+            <div class="mini"><strong>3X Max Payout</strong><span>Clear cap mechanics</span></div>
+          </div>
+          <div class="hero-actions">
+            <a class="btn" href="#" aria-label="Launch Mountain Miner dapp">Launch Miner</a>
+            <a class="btn secondary" href="#docs">Miner Docs</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="docs">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>GitBook Ready</h2>
+          <p>
+            The included docs folder is structured for GitBook: overview, tokenomics, rewards, Mountain Miner mechanics,
+            risks, and contract/security pages.
+          </p>
+        </div>
+        <div class="cards">
+          <article class="card glass"><div class="icon">📘</div><h3>Altitude Docs</h3><p>Project overview, token, supply, rewards, treasury, and links.</p></article>
+          <article class="card glass"><div class="icon">⛏</div><h3>Miner Docs</h3><p>Deposit rules, ROI range, claims, 3X max payout, and user examples.</p></article>
+          <article class="card glass"><div class="icon">🛡</div><h3>Risk Disclosures</h3><p>Clear wording for high-risk DeFi, contract risk, liquidity risk, and ROI sustainability.</p></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <strong>Altitude Project</strong>
+      <p>Built for Base. Replace placeholder dapp/docs links before deployment.</p>
+      <p class="risk">
+        Risk notice: Crypto and DeFi products are high risk. Rewards, ROI rates, token price, and liquidity are not guaranteed.
+        Users should only deposit funds they can afford to lose.
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    const TOKEN_ADDRESS = "0x90678C02823b21772fa7e91B27EE70490257567B";
+    const START_SUPPLY = 210_000_000;
+    const BASE_RPC = "https://mainnet.base.org";
+
+    const selectors = {
+      totalSupply: "0x18160ddd",
+      decimals: "0x313ce567"
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function formatNumber(value, maxDecimals = 2) {
+      return Number(value).toLocaleString(undefined, {
+        maximumFractionDigits: maxDecimals
+      });
+    }
+
+    function formatUsd(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return "Unavailable";
+      if (n < 0.0001) return "$" + n.toFixed(8);
+      if (n < 0.01) return "$" + n.toFixed(6);
+      return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    }
+
+    async function rpcCall(data) {
+      const res = await fetch(BASE_RPC, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_call",
+          params: [{ to: TOKEN_ADDRESS, data }, "latest"]
+        })
+      });
+      if (!res.ok) throw new Error("RPC request failed");
+      const json = await res.json();
+      if (!json.result) throw new Error("Empty RPC result");
+      return BigInt(json.result);
+    }
+
+    async function loadSupplyStats() {
+      try {
+        const [rawSupply, decimalsRaw] = await Promise.all([
+          rpcCall(selectors.totalSupply),
+          rpcCall(selectors.decimals)
+        ]);
+
+        const decimals = Number(decimalsRaw);
+        const divisor = 10 ** decimals;
+        const supply = Number(rawSupply) / divisor;
+        const burned = Math.max(0, START_SUPPLY - supply);
+        const burnPct = burned / START_SUPPLY * 100;
+
+        $("totalSupply").textContent = formatNumber(supply, 0);
+        $("tokensBurned").textContent = formatNumber(burned, 0);
+        $("burnPercent").textContent = burnPct.toFixed(2) + "%";
+      } catch (err) {
+        console.error(err);
+        $("totalSupply").textContent = "Unavailable";
+        $("tokensBurned").textContent = "Unavailable";
+        $("burnPercent").textContent = "Unavailable";
+      }
+    }
+
+    async function loadPrice() {
+      const geckoUrl = `https://api.geckoterminal.com/api/v2/networks/base/tokens/${TOKEN_ADDRESS}`;
+      const dexUrl = `https://api.dexscreener.com/latest/dex/tokens/${TOKEN_ADDRESS}`;
+
+      try {
+        const res = await fetch(geckoUrl);
+        if (!res.ok) throw new Error("GeckoTerminal failed");
+        const json = await res.json();
+        const price = json?.data?.attributes?.price_usd;
+        if (!price) throw new Error("No GeckoTerminal price");
+        $("priceUsd").textContent = formatUsd(price);
+        $("priceSource").textContent = "Source: GeckoTerminal token API";
+        return;
+      } catch (err) {
+        console.warn("GeckoTerminal fallback triggered", err);
+      }
+
+      try {
+        const res = await fetch(dexUrl);
+        if (!res.ok) throw new Error("Dexscreener failed");
+        const json = await res.json();
+        const pairs = json?.pairs || [];
+        const best = pairs
+          .filter(p => p.chainId === "base" && p.priceUsd)
+          .sort((a, b) => Number(b.liquidity?.usd || 0) - Number(a.liquidity?.usd || 0))[0];
+
+        if (!best) throw new Error("No Dexscreener price");
+        $("priceUsd").textContent = formatUsd(best.priceUsd);
+        $("priceSource").textContent = `Source: Dexscreener, ${best.dexId || "Base pair"}`;
+      } catch (err) {
+        console.error(err);
+        $("priceUsd").textContent = "Unavailable";
+        $("priceSource").textContent = "No public API price found";
+      }
+    }
+
+    async function copyToken() {
+      await navigator.clipboard.writeText(TOKEN_ADDRESS);
+      const btn = document.querySelector(".copy");
+      const old = btn.textContent;
+      btn.textContent = "Copied";
+      setTimeout(() => btn.textContent = old, 1200);
+    }
+
+    loadSupplyStats();
+    loadPrice();
+    setInterval(loadSupplyStats, 60_000);
+    setInterval(loadPrice, 60_000);
+  </script>
+</body>
+</html>
