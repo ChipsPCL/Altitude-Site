@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Altitude Project | Mountain Miner</title>
-  <meta name="description" content="Altitude Project ecosystem on Base. Deflationary tokenomics, USDC rewards, and Mountain Miner DeFi miner dapp." />
+  <title>Altitude Project | Base DeFi Ecosystem</title>
+  <meta name="description" content="Altitude Project ecosystem on Base. Deflationary tokenomics, USDC rewards, Everest Vault, Mountain Miner, and future DeFi dapp products." />
   <link rel="preconnect" href="https://api.geckoterminal.com" />
   <link rel="preconnect" href="https://mainnet.base.org" />
+
   <style>
     :root {
       --bg: #030814;
@@ -27,7 +28,9 @@
     }
 
     * { box-sizing: border-box; }
+
     html { scroll-behavior: smooth; }
+
     body {
       margin: 0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -52,10 +55,21 @@
       z-index: -1;
     }
 
-    a { color: inherit; text-decoration: none; }
-    img { max-width: 100%; display: block; }
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
 
-    .wrap { width: min(var(--max), calc(100% - 32px)); margin: 0 auto; }
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    .wrap {
+      width: min(var(--max), calc(100% - 32px));
+      margin: 0 auto;
+    }
+
     .glass {
       background: linear-gradient(180deg, rgba(11, 25, 53, 0.82), rgba(5, 13, 28, 0.74));
       border: 1px solid var(--line);
@@ -81,89 +95,363 @@
       gap: 24px;
     }
 
-    .brand { display: flex; align-items: center; gap: 12px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
-    .brand img { width: 42px; height: 42px; border-radius: 999px; box-shadow: 0 0 22px rgba(39, 215, 255, 0.35); }
-    .navlinks { display: flex; align-items: center; gap: 22px; color: var(--muted); font-weight: 700; font-size: 0.9rem; }
-    .navlinks a:hover { color: var(--cyan); }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .brand img {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      box-shadow: 0 0 22px rgba(39, 215, 255, 0.35);
+    }
+
+    .navlinks {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .navlinks a:hover {
+      color: var(--cyan);
+    }
 
     .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-      min-height: 46px; padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 46px;
+      padding: 0 18px;
       border: 1px solid rgba(39, 215, 255, 0.35);
       background: linear-gradient(135deg, rgba(39, 215, 255, 0.18), rgba(11, 132, 255, 0.26));
-      color: white; border-radius: 999px; font-weight: 900; letter-spacing: 0.02em;
+      color: white;
+      border-radius: 999px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
       box-shadow: 0 0 24px rgba(39, 215, 255, 0.18);
+      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
     }
-    .btn.secondary { background: rgba(255,255,255,0.045); color: var(--text); }
-    .btn:hover { transform: translateY(-1px); border-color: rgba(39, 215, 255, 0.72); }
 
-    .hero { padding: 56px 0 22px; position: relative; }
-    .hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: center; }
-    .eyebrow { color: var(--cyan); text-transform: uppercase; letter-spacing: 0.22em; font-weight: 900; font-size: 0.78rem; }
-    h1 { margin: 18px 0 16px; font-size: clamp(3rem, 7vw, 6.4rem); line-height: 0.92; letter-spacing: -0.07em; text-transform: uppercase; }
-    h1 span { display: block; color: var(--cyan); text-shadow: 0 0 28px rgba(39, 215, 255, 0.45); }
-    .lead { color: #c7d8e8; font-size: clamp(1.05rem, 2vw, 1.28rem); line-height: 1.65; max-width: 650px; }
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
-    .hero-card { padding: 14px; overflow: hidden; }
-    .hero-card img { border-radius: 22px; border: 1px solid rgba(39, 215, 255, 0.18); box-shadow: 0 0 60px rgba(39, 215, 255, 0.14); }
+    .btn.secondary {
+      background: rgba(255,255,255,0.045);
+      color: var(--text);
+    }
 
-    .stats { padding: 24px 0 34px; }
-    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .stat { padding: 20px; min-height: 128px; }
-    .stat .label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 900; font-size: 0.72rem; }
-    .stat .value { margin-top: 12px; font-size: clamp(1.35rem, 2.4vw, 2rem); font-weight: 950; letter-spacing: -0.04em; }
-    .stat .sub { margin-top: 8px; color: var(--muted); font-size: 0.9rem; }
-    .status-dot { display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 999px; box-shadow: 0 0 14px var(--success); margin-right: 8px; }
+    .btn.disabled {
+      cursor: default;
+      opacity: 0.72;
+      background: rgba(255,255,255,0.045);
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: none;
+    }
 
-    section { padding: 48px 0; }
-    .section-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 20px; }
-    h2 { margin: 0; font-size: clamp(2rem, 4vw, 3.2rem); letter-spacing: -0.055em; text-transform: uppercase; }
-    .section-head p { max-width: 560px; color: var(--muted); line-height: 1.6; margin: 0; }
+    .btn:not(.disabled):hover {
+      transform: translateY(-1px);
+      border-color: rgba(39, 215, 255, 0.72);
+    }
 
-    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .card { padding: 24px; }
+    .hero {
+      padding: 56px 0 22px;
+      position: relative;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      font-weight: 900;
+      font-size: 0.78rem;
+    }
+
+    h1 {
+      margin: 18px 0 16px;
+      font-size: clamp(3rem, 7vw, 6.4rem);
+      line-height: 0.92;
+      letter-spacing: -0.07em;
+      text-transform: uppercase;
+    }
+
+    h1 span {
+      display: block;
+      color: var(--cyan);
+      text-shadow: 0 0 28px rgba(39, 215, 255, 0.45);
+    }
+
+    .lead {
+      color: #c7d8e8;
+      font-size: clamp(1.05rem, 2vw, 1.28rem);
+      line-height: 1.65;
+      max-width: 650px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .hero-card {
+      padding: 14px;
+      overflow: hidden;
+    }
+
+    .hero-card img {
+      border-radius: 22px;
+      border: 1px solid rgba(39, 215, 255, 0.18);
+      box-shadow: 0 0 60px rgba(39, 215, 255, 0.14);
+    }
+
+    .stats {
+      padding: 24px 0 34px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .stat {
+      padding: 20px;
+      min-height: 128px;
+    }
+
+    .stat .label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 900;
+      font-size: 0.72rem;
+    }
+
+    .stat .value {
+      margin-top: 12px;
+      font-size: clamp(1.35rem, 2.4vw, 2rem);
+      font-weight: 950;
+      letter-spacing: -0.04em;
+    }
+
+    .stat .sub {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 999px;
+      box-shadow: 0 0 14px var(--success);
+      margin-right: 8px;
+    }
+
+    section {
+      padding: 48px 0;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      letter-spacing: -0.055em;
+      text-transform: uppercase;
+    }
+
+    .section-head p {
+      max-width: 560px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      padding: 24px;
+      display: block;
+      transition: transform 0.18s ease, border-color 0.18s ease;
+    }
+
+    a.card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(39, 215, 255, 0.55);
+    }
+
     .icon {
-      width: 48px; height: 48px; display: grid; place-items: center;
-      border-radius: 16px; border: 1px solid rgba(39, 215, 255, 0.28);
-      background: rgba(39, 215, 255, 0.08); color: var(--cyan); font-size: 1.35rem;
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      border: 1px solid rgba(39, 215, 255, 0.28);
+      background: rgba(39, 215, 255, 0.08);
+      color: var(--cyan);
+      font-size: 1.35rem;
       box-shadow: inset 0 0 18px rgba(39, 215, 255, 0.08);
     }
-    .card h3 { margin: 18px 0 10px; font-size: 1.18rem; }
-    .card p { margin: 0; color: var(--muted); line-height: 1.65; }
 
-    .miner { display: grid; grid-template-columns: 0.95fr 1.05fr; gap: 18px; align-items: center; }
-    .miner .panel { padding: 28px; }
-    .mini-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; }
-    .mini { padding: 16px; border-radius: 18px; background: rgba(255,255,255,0.035); border: 1px solid rgba(39, 215, 255, 0.14); }
-    .mini strong { display: block; font-size: 1.1rem; }
-    .mini span { color: var(--muted); font-size: 0.9rem; }
+    .card h3 {
+      margin: 18px 0 10px;
+      font-size: 1.18rem;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .dapp {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .dapp .panel {
+      padding: 28px;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .mini {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(39, 215, 255, 0.14);
+    }
+
+    .mini strong {
+      display: block;
+      font-size: 1.1rem;
+    }
+
+    .mini span {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+      display: block;
+      margin-top: 4px;
+    }
 
     .token-address {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      padding: 14px 16px; border-radius: 18px; background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(39, 215, 255, 0.16); color: #cfeeff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      overflow-wrap: anywhere; margin-top: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(39, 215, 255, 0.16);
+      color: #cfeeff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+      margin-top: 20px;
     }
-    .copy { cursor: pointer; border: 0; color: var(--cyan); background: transparent; font-weight: 900; }
 
-    footer { padding: 42px 0; color: var(--muted); border-top: 1px solid rgba(39, 215, 255, 0.12); }
-    .risk { color: #d9a9b6; font-size: 0.92rem; line-height: 1.6; margin-top: 18px; }
+    .copy {
+      cursor: pointer;
+      border: 0;
+      color: var(--cyan);
+      background: transparent;
+      font-weight: 900;
+    }
+
+    footer {
+      padding: 42px 0;
+      color: var(--muted);
+      border-top: 1px solid rgba(39, 215, 255, 0.12);
+    }
+
+    .risk {
+      color: #d9a9b6;
+      font-size: 0.92rem;
+      line-height: 1.6;
+      margin-top: 18px;
+    }
 
     @media (max-width: 900px) {
-      .navlinks { display: none; }
-      .hero-grid, .miner { grid-template-columns: 1fr; }
-      .stat-grid, .cards { grid-template-columns: repeat(2, 1fr); }
-      .section-head { display: block; }
-      .section-head p { margin-top: 10px; }
+      .navlinks {
+        display: none;
+      }
+
+      .hero-grid,
+      .dapp {
+        grid-template-columns: 1fr;
+      }
+
+      .stat-grid,
+      .cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .section-head p {
+        margin-top: 10px;
+      }
     }
 
     @media (max-width: 560px) {
-      .stat-grid, .cards, .mini-grid { grid-template-columns: 1fr; }
-      h1 { font-size: 3rem; }
-      .brand span { display: none; }
+      .stat-grid,
+      .cards,
+      .mini-grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 3rem;
+      }
+
+      .brand span {
+        display: none;
+      }
+
+      .token-address {
+        align-items: flex-start;
+        flex-direction: column;
+      }
     }
   </style>
 </head>
+
 <body>
   <header>
     <nav class="wrap nav">
@@ -171,13 +459,18 @@
         <img src="assets/altitude-logo.jpg" alt="Altitude logo">
         <span>Altitude</span>
       </a>
+
       <div class="navlinks">
         <a href="#stats">Live Stats</a>
         <a href="#altitude">Altitude</a>
-        <a href="#miner">Mountain Miner</a>
-        <a href="#docs">Docs</a>
+        <a href="#dapp">Dapp</a>
+        <a href="https://thealtitudeproject.gitbook.io/docs" target="_blank" rel="noopener noreferrer">Docs</a>
+        <a href="https://t.me/AltitudeProject" target="_blank" rel="noopener noreferrer">Telegram</a>
       </div>
-      <a class="btn" href="#miner">Launch Dapp</a>
+
+      <a class="btn" href="https://t.me/AltitudeProject" target="_blank" rel="noopener noreferrer">
+        Join Telegram
+      </a>
     </nav>
   </header>
 
@@ -186,15 +479,24 @@
       <div class="wrap hero-grid">
         <div>
           <div class="eyebrow">Altitude Project Ecosystem</div>
+
           <h1>Join the <span>Ascent</span></h1>
+
           <p class="lead">
             A Base-chain DeFi ecosystem built around deflationary tokenomics, external project revenue,
-            Everest USDC reward staking, and the Farm/Mountain Miner DeFi miner dapp.
+            Everest USDC reward staking, Mountain Miner, and future ecosystem dapp products.
           </p>
+
           <div class="hero-actions">
-            <a class="btn" href="#stats">View Live Stats</a>
-            <a class="btn secondary" href="#docs">Read GitBook</a>
+            <a class="btn" href="https://t.me/AltitudeProject" target="_blank" rel="noopener noreferrer">
+              Join Telegram
+            </a>
+
+            <a class="btn secondary" href="https://thealtitudeproject.gitbook.io/docs" target="_blank" rel="noopener noreferrer">
+              Read Docs
+            </a>
           </div>
+
           <div class="token-address" title="Altitude contract address">
             <span id="tokenAddress">0x90678C02823b21772fa7e91B27EE70490257567B</span>
             <button class="copy" type="button" onclick="copyToken()">Copy</button>
@@ -214,16 +516,19 @@
           <div class="value" id="priceUsd">Loading…</div>
           <div class="sub" id="priceSource">Fetching from GeckoTerminal / Dexscreener</div>
         </div>
+
         <div class="stat glass">
           <div class="label">Current Supply</div>
           <div class="value" id="totalSupply">Loading…</div>
           <div class="sub">Read from Base RPC totalSupply()</div>
         </div>
+
         <div class="stat glass">
           <div class="label">Tokens Burned</div>
           <div class="value" id="tokensBurned">Loading…</div>
           <div class="sub">210,000,000 - current total supply</div>
         </div>
+
         <div class="stat glass">
           <div class="label">Burn Progress</div>
           <div class="value" id="burnPercent">Loading…</div>
@@ -236,52 +541,86 @@
       <div class="wrap">
         <div class="section-head">
           <h2>Altitude Token</h2>
+
           <p>
-            The core ecosystem token. The website tracks live market price and burn progress automatically,
-           with on-chain reads and public market data APIs.
+            The core ecosystem token. This website tracks live market price and burn progress automatically
+            using on-chain reads and public market data APIs.
           </p>
         </div>
+
         <div class="cards">
           <article class="card glass">
             <div class="icon">⛰</div>
             <h3>Deflationary Supply</h3>
-            <p>Altitude tokens are burn through revenue injected buyback and burns! </p>
+            <p>Altitude tokens are burned through revenue-funded buybacks and burns.</p>
           </article>
+
           <article class="card glass">
             <div class="icon">$</div>
             <h3>Everest Vault</h3>
-            <p>Stake Altitude to earn USDC rewards funded by external revenue and project fees!</p>
+            <p>Stake Altitude to earn USDC rewards funded by external revenue and project fees.</p>
           </article>
+
           <article class="card glass">
             <div class="icon">↗</div>
             <h3>Ecosystem Growth</h3>
-            <p>Altitude is supported by the Mountain Wallet, continiously injecting fresh funds into the project.</p>
+            <p>Altitude is supported by the Mountain Wallet, which helps inject fresh funds into the project over time.</p>
           </article>
         </div>
       </div>
     </section>
 
-    <section id="miner">
-      <div class="wrap miner">
+    <section id="dapp">
+      <div class="wrap dapp">
         <div class="hero-card glass">
-          <img src="assets/mountain-miner-logo.png" alt="Mountain Miner logo">
+          <img src="assets/mountain-miner-logo.png" alt="Altitude DeFi Dapp logo">
         </div>
+
         <div class="panel glass">
-          <div class="eyebrow">DeFi Miner Dapp</div>
-          <h2>Mountain Miner</h2>
+          <div class="eyebrow">Altitude DeFi Dapp</div>
+
+          <h2>Everest USDC Vault & Mountain Miner</h2>
+
           <p class="lead">
-            A simple ROI-style miner experience for the Altitude ecosystem: deposit USDC, track daily ROI,
-            claim rewards, and understand the 3X maximum payout before depositing.
+            The Altitude dapp will bring the ecosystem together in one place, starting with Everest USDC
+            reward staking and Mountain Miner. Whether Everest or Mountain Miner launches first, both are
+            designed to create new utility, support project revenue, and strengthen the Altitude ecosystem.
           </p>
+
           <div class="mini-grid">
-            <div class="mini"><strong>Deposit USDC</strong><span>Simple USDC entry</span></div>
-            <div class="mini"><strong>0.5-1% Daily</strong><span>Configurable ROI range</span></div>
-            <div class="mini"><strong>Claim Rewards</strong><span>User-controlled payout</span></div>
-            <div class="mini"><strong>3X Max Payout</strong><span>Clear cap mechanics</span></div>
+            <div class="mini">
+              <strong>Everest USDC Vault</strong>
+              <span>Stake Altitude and earn USDC rewards funded by ecosystem activity.</span>
+            </div>
+
+            <div class="mini">
+              <strong>Mountain Miner</strong>
+              <span>Deposit USDC, earn daily ROI, claim rewards, and track your 3X max payout.</span>
+            </div>
+
+            <div class="mini">
+              <strong>Project Revenue</strong>
+              <span>Fees and ecosystem inflows help support the Mountain Wallet treasury.</span>
+            </div>
+
+            <div class="mini">
+              <strong>Built on Base</strong>
+              <span>Simple, transparent DeFi products built around the Altitude ecosystem.</span>
+            </div>
           </div>
+
           <div class="hero-actions">
-            <a class="btn" href="#" aria-label="Launch Mountain Miner dapp">Launch Miner</a>
-            <a class="btn secondary" href="#docs">Miner Docs</a>
+            <a class="btn disabled" href="#dapp" aria-label="Altitude dapp coming soon">
+              Dapp Coming Soon
+            </a>
+
+            <a class="btn secondary" href="https://thealtitudeproject.gitbook.io/docs/mountain-miner/overview" target="_blank" rel="noopener noreferrer">
+              Mountain Miner Docs
+            </a>
+
+            <a class="btn secondary" href="https://thealtitudeproject.gitbook.io/docs" target="_blank" rel="noopener noreferrer">
+              Full Docs
+            </a>
           </div>
         </div>
       </div>
@@ -291,14 +630,31 @@
       <div class="wrap">
         <div class="section-head">
           <h2>Documentation</h2>
+
           <p>
-            Learn about our ecosystem.
+            Learn about the Altitude ecosystem, tokenomics, burn mechanics, Everest Vault,
+            Mountain Miner, risk disclosures, security, and future roadmap.
           </p>
         </div>
+
         <div class="cards">
-          <article class="card glass"><div class="icon">📘</div><h3>Altitude Docs</h3><p>Project overview, token, supply, rewards, treasury, and links.</p></article>
-          <article class="card glass"><div class="icon">⛏</div><h3>Miner Docs</h3><p>Deposit rules, ROI range, claims, 3X max payout, and user examples.</p></article>
-          <article class="card glass"><div class="icon">🛡</div><h3>Risk Disclosures</h3><p>Clear wording for high-risk DeFi, contract risk, liquidity risk, and ROI sustainability.</p></article>
+          <a class="card glass" href="https://thealtitudeproject.gitbook.io/docs" target="_blank" rel="noopener noreferrer">
+            <div class="icon">📘</div>
+            <h3>Altitude Docs</h3>
+            <p>Project overview, tokenomics, supply, rewards, treasury, security, and roadmap.</p>
+          </a>
+
+          <a class="card glass" href="https://thealtitudeproject.gitbook.io/docs/mountain-miner/overview" target="_blank" rel="noopener noreferrer">
+            <div class="icon">⛏</div>
+            <h3>Mountain Miner Docs</h3>
+            <p>Deposit rules, ROI range, claims, 3X max payout, launch rates, and end game support.</p>
+          </a>
+
+          <a class="card glass" href="https://thealtitudeproject.gitbook.io/docs/risk-notice" target="_blank" rel="noopener noreferrer">
+            <div class="icon">🛡</div>
+            <h3>Risk Disclosures</h3>
+            <p>Clear wording for high-risk DeFi, contract risk, liquidity risk, ROI sustainability, and user safety.</p>
+          </a>
         </div>
       </div>
     </section>
@@ -307,10 +663,11 @@
   <footer>
     <div class="wrap">
       <strong>Altitude Project</strong>
-      <p>Built  on Base. Launched February 2024 $0.00002015.</p>
+      <p>Built on Base. Launched February 2024 at $0.00002015.</p>
+
       <p class="risk">
-        Risk notice: Crypto and DeFi products are high risk. Rewards, ROI rates and token price are not guaranteed.
-        Users should only use funds they can afford to lose.
+        Risk notice: Crypto and DeFi products are high risk. Rewards, ROI rates, token price,
+        liquidity, and contract balances are not guaranteed. Users should only use funds they can afford to lose.
       </p>
     </div>
   </footer>
@@ -335,26 +692,42 @@
 
     function formatUsd(value) {
       const n = Number(value);
+
       if (!Number.isFinite(n)) return "Unavailable";
       if (n < 0.0001) return "$" + n.toFixed(8);
       if (n < 0.01) return "$" + n.toFixed(6);
-      return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+
+      return "$" + n.toLocaleString(undefined, {
+        maximumFractionDigits: 4
+      });
     }
 
     async function rpcCall(data) {
       const res = await fetch(BASE_RPC, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json"
+        },
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: 1,
           method: "eth_call",
-          params: [{ to: TOKEN_ADDRESS, data }, "latest"]
+          params: [
+            {
+              to: TOKEN_ADDRESS,
+              data
+            },
+            "latest"
+          ]
         })
       });
+
       if (!res.ok) throw new Error("RPC request failed");
+
       const json = await res.json();
+
       if (!json.result) throw new Error("Empty RPC result");
+
       return BigInt(json.result);
     }
 
@@ -388,10 +761,14 @@
 
       try {
         const res = await fetch(geckoUrl);
+
         if (!res.ok) throw new Error("GeckoTerminal failed");
+
         const json = await res.json();
         const price = json?.data?.attributes?.price_usd;
+
         if (!price) throw new Error("No GeckoTerminal price");
+
         $("priceUsd").textContent = formatUsd(price);
         $("priceSource").textContent = "Source: GeckoTerminal token API";
         return;
@@ -401,7 +778,9 @@
 
       try {
         const res = await fetch(dexUrl);
+
         if (!res.ok) throw new Error("Dexscreener failed");
+
         const json = await res.json();
         const pairs = json?.pairs || [];
         const best = pairs
@@ -409,6 +788,7 @@
           .sort((a, b) => Number(b.liquidity?.usd || 0) - Number(a.liquidity?.usd || 0))[0];
 
         if (!best) throw new Error("No Dexscreener price");
+
         $("priceUsd").textContent = formatUsd(best.priceUsd);
         $("priceSource").textContent = `Source: Dexscreener, ${best.dexId || "Base pair"}`;
       } catch (err) {
@@ -420,14 +800,20 @@
 
     async function copyToken() {
       await navigator.clipboard.writeText(TOKEN_ADDRESS);
+
       const btn = document.querySelector(".copy");
       const old = btn.textContent;
+
       btn.textContent = "Copied";
-      setTimeout(() => btn.textContent = old, 1200);
+
+      setTimeout(() => {
+        btn.textContent = old;
+      }, 1200);
     }
 
     loadSupplyStats();
     loadPrice();
+
     setInterval(loadSupplyStats, 60_000);
     setInterval(loadPrice, 60_000);
   </script>
