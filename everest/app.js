@@ -1,461 +1,1065 @@
-// Everest ALT Vault dApp — plain HTML/JavaScript
-// Test deployment. For production, changing EVEREST_ADDRESS and TEST_MODE is enough
-// provided the final contract uses the same EverestVaultALT ABI.
+// app.js — Everest ALT Vault (ALT stake -> ALT rewards) — BASE TEST VERSION
+// Everest Test Vault: 0x42EDDCe0ab1269c8eC614A6bDc2ba16dC8445424
+// ALT:                0x90678C02823b21772fa7e91B27EE70490257567B
 
-const EVEREST_ADDRESS = "0x42EDDCe0ab1269c8eC614A6bDc2ba16dC8445424";
-const ALTITUDE_ADDRESS = "0x90678C02823b21772fa7e91B27EE70490257567B";
+// ====== CONFIG ======
+const FARM_ADDRESS = "0x42EDDCe0ab1269c8eC614A6bDc2ba16dC8445424";
+const ALT = "0x90678C02823b21772fa7e91B27EE70490257567B";
 
-const TEST_MODE = true;
+const DEX_CHAIN = "base";
+const PAIR_ALT_WETH = "0xd57f6e7d7ec911ba8defcf93d3682bb76959e950";
 
-const BASE_CHAIN_ID = 8453n;
-const GECKO_URL = `https://api.geckoterminal.com/api/v2/networks/base/tokens/${ALTITUDE_ADDRESS}`;
-const DEXSCREENER_URL = `https://api.dexscreener.com/latest/dex/tokens/${ALTITUDE_ADDRESS}`;
+const REFRESH_MS = 30 * 1000;
 
-const VAULT_ABI = [
-  "function altitudeToken() view returns (address)",
-  "function totalStaked() view returns (uint256)",
-  "function rewardReserve() view returns (uint256)",
-  "function allocatedRewards() view returns (uint256)",
-  "function feesAccrued() view returns (uint256)",
-  "function vaultBalance() view returns (uint256)",
-  "function availableRewards() view returns (uint256)",
-  "function allocatedBalance() view returns (uint256)",
-  "function rewardBalance() view returns (uint256)",
-  "function accountedBalance() view returns (uint256)",
-  "function untrackedRewards() view returns (uint256)",
-  "function isSolvent() view returns (bool)",
-  "function dailyDripEstimate() view returns (uint256)",
-  "function yearlyDripEstimate() view returns (uint256)",
-  "function currentAprBps() view returns (uint256)",
-  "function users(address) view returns (uint256 amount, uint256 rewardDebt)",
-  "function pendingRewards(address) view returns (uint256)",
+// ====== ABIs ======
+const farmABI = [
   "function deposit(uint256 amount)",
   "function withdraw(uint256 amount)",
   "function claim()",
   "function updatePool()",
-  "function syncRewards()"
+  "function syncRewards()",
+
+  "function pendingRewards(address user) view returns (uint256)",
+  "function totalStaked() view returns (uint256)",
+  "function users(address) view returns (uint256 amount, uint256 rewardDebt)",
+
+  "function rewardBalance() view returns (uint256)",
+  "function allocatedBalance() view returns (uint256)",
+  "function availableRewards() view returns (uint256)",
+  "function dailyDripEstimate() view returns (uint256)",
+  "function yearlyDripEstimate() view returns (uint256)",
+  "function currentAprBps() view returns (uint256)",
+  "function isSolvent() view returns (bool)",
 ];
 
-const TOKEN_ABI = [
+const erc20ABI = [
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)",
   "function decimals() view returns (uint8)",
-  "function symbol() view returns (string)",
-  "function balanceOf(address) view returns (uint256)",
-  "function allowance(address,address) view returns (uint256)",
-  "function approve(address,uint256) returns (bool)"
 ];
 
+// ====== STATE ======
 let provider;
 let signer;
-let account;
-let vaultRead;
-let vaultWrite;
-let tokenRead;
-let tokenWrite;
-let decimals = 18;
-let altPriceUsd = 0;
+let user;
+let farm;
+let alt;
 
+let tokenDecimals = 18;
+
+let cachedAltPriceUsd = null;
+let lastPriceTs = 0;
+let refreshTimer = null;
+
+// ====== DOM HELPERS ======
 const $ = (id) => document.getElementById(id);
 
-function fmtToken(raw, maxDecimals = 2) {
-  const n = Number(ethers.formatUnits(raw ?? 0n, decimals));
-  return n.toLocaleString(undefined, { maximumFractionDigits: maxDecimals });
-}
+function setText(id, text) {
+  const el = $(id);
 
-function fmtTokenNumber(n, maxDecimals = 2) {
-  return Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: maxDecimals });
+  if (el) {
+    el.innerText = text;
+  }
 }
 
 function fmtUsd(n) {
-  const value = Number(n || 0);
-  if (!Number.isFinite(value)) return "$0.00";
-  if (Math.abs(value) < 0.01 && value !== 0) return "$" + value.toFixed(6);
-  return value.toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2
-  });
-}
-
-function setStatus(text, isError = false) {
-  $("status").textContent = text;
-  $("status").style.color = isError ? "#ff8ba3" : "";
-}
-
-function shortAddress(a) {
-  return `${a.slice(0, 6)}…${a.slice(-4)}`;
-}
-
-function setBusy(busy) {
-  ["btnConnect","btnDeposit","btnWithdraw","btnClaim","btnUpdate"].forEach(id => {
-    const b = $(id);
-    if (b) b.disabled = busy;
-  });
-}
-
-async function fetchAltPrice() {
-  try {
-    const r = await fetch(GECKO_URL);
-    if (!r.ok) throw new Error("GeckoTerminal unavailable");
-    const j = await r.json();
-    const p = Number(j?.data?.attributes?.price_usd);
-    if (!Number.isFinite(p) || p <= 0) throw new Error("No GeckoTerminal price");
-    altPriceUsd = p;
-    return p;
-  } catch (e) {
-    console.warn("GeckoTerminal price failed; trying Dexscreener.", e);
+  if (
+    n === null ||
+    Number.isNaN(n) ||
+    !Number.isFinite(n)
+  ) {
+    return "-";
   }
 
-  try {
-    const r = await fetch(DEXSCREENER_URL);
-    if (!r.ok) throw new Error("Dexscreener unavailable");
-    const j = await r.json();
-    const best = (j?.pairs || [])
-      .filter(p => p.chainId === "base" && Number(p.priceUsd) > 0)
-      .sort((a,b) => Number(b.liquidity?.usd || 0) - Number(a.liquidity?.usd || 0))[0];
-
-    if (!best) throw new Error("No Base pair price");
-    altPriceUsd = Number(best.priceUsd);
-    return altPriceUsd;
-  } catch (e) {
-    console.error("ALT price unavailable", e);
-    altPriceUsd = 0;
-    return 0;
+  if (
+    Math.abs(n) > 0 &&
+    Math.abs(n) < 0.01
+  ) {
+    return "$" + n.toFixed(6);
   }
+
+  return (
+    "$" +
+    n.toLocaleString(undefined, {
+      maximumFractionDigits: 2,
+    })
+  );
 }
 
-async function getReadProvider() {
-  if (provider) return provider;
-  provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
-  return provider;
-}
-
-async function initReadContracts() {
-  const p = await getReadProvider();
-  vaultRead = new ethers.Contract(EVEREST_ADDRESS, VAULT_ABI, p);
-  tokenRead = new ethers.Contract(ALTITUDE_ADDRESS, TOKEN_ABI, p);
-  decimals = Number(await tokenRead.decimals());
-
-  // Safety check: test vault must point at the intended ALT contract.
-  const configuredToken = (await vaultRead.altitudeToken()).toLowerCase();
-  if (configuredToken !== ALTITUDE_ADDRESS.toLowerCase()) {
-    throw new Error("Vault token mismatch");
+function fmtPct(n) {
+  if (
+    n === null ||
+    Number.isNaN(n) ||
+    !Number.isFinite(n)
+  ) {
+    return "-";
   }
+
+  return n.toFixed(2) + "%";
 }
 
-async function refreshVault() {
+// Shows small balances without them looking like zero too early.
+function fmtUnitsSmart(
+  valueWei,
+  decimals,
+  displayDecimals = 8
+) {
   try {
-    if (!vaultRead) await initReadContracts();
+    const s = ethers.formatUnits(
+      valueWei,
+      decimals
+    );
 
-    const [
-      totalStakedRaw,
-      reserveRaw,
-      dailyRaw,
-      solvent
-    ] = await Promise.all([
-      vaultRead.totalStaked(),
-      vaultRead.availableRewards(),
-      vaultRead.dailyDripEstimate(),
-      vaultRead.isSolvent()
-    ]);
-
-    await fetchAltPrice();
-
-    const totalStaked = Number(ethers.formatUnits(totalStakedRaw, decimals));
-    const reserve = Number(ethers.formatUnits(reserveRaw, decimals));
-    const daily = Number(ethers.formatUnits(dailyRaw, decimals));
-
-    $("reserve").textContent = `${fmtTokenNumber(reserve)} ALT`;
-    $("reserveUsd").textContent = fmtUsd(reserve * altPriceUsd);
-
-    $("vaultTvlAlt").textContent = `${fmtTokenNumber(totalStaked)} ALT`;
-    $("vaultTvlUsd").textContent = fmtUsd(totalStaked * altPriceUsd);
-
-    $("dailyRewards").textContent = `${fmtTokenNumber(daily, 4)} ALT`;
-    $("dailyRewardsUsd").textContent = fmtUsd(daily * altPriceUsd);
-
-    $("altPrice").textContent = altPriceUsd > 0
-      ? (altPriceUsd < 0.01 ? "$" + altPriceUsd.toFixed(7) : fmtUsd(altPriceUsd))
-      : "Unavailable";
-
-    // USD-value APR:
-    // projected annual reward value / current USD value of total staked.
-    // Both are ALT-valued at the same live market price, but this presentation
-    // explicitly expresses the yield against the dollar value of the vault.
-    if (totalStaked > 0 && altPriceUsd > 0) {
-      const tvlUsd = totalStaked * altPriceUsd;
-      const annualRewardsUsd = daily * 365 * altPriceUsd;
-      const apr = (annualRewardsUsd / tvlUsd) * 100;
-
-      $("apr").textContent = `${apr.toFixed(2)}%`;
-      $("aprUsdBasis").textContent =
-        `${fmtUsd(annualRewardsUsd)}/yr rewards ÷ ${fmtUsd(tvlUsd)} staked`;
-    } else if (totalStaked > 0) {
-      // Price unavailable: percentage is still mathematically the same because
-      // both the reward and stake asset are ALT. We don't label it USD basis.
-      const apr = (daily * 365 / totalStaked) * 100;
-      $("apr").textContent = `${apr.toFixed(2)}%`;
-      $("aprUsdBasis").textContent = "ALT price unavailable — token ratio shown";
-    } else {
-      $("apr").textContent = "—";
-      $("aprUsdBasis").textContent = "No ALT currently staked";
+    if (!s.includes(".")) {
+      return s;
     }
 
-    if (!solvent) {
-      setStatus("Warning: vault accounting reports insolvency.", true);
+    const [a, b] = s.split(".");
+    const cut = b.slice(
+      0,
+      displayDecimals
+    );
+
+    const isZeroDisplay =
+      (a === "0" || a === "-0") &&
+      cut.length > 0 &&
+      /^0+$/.test(cut);
+
+    if (
+      isZeroDisplay &&
+      valueWei > 0n
+    ) {
+      return (
+        "<" +
+        (
+          1 /
+          10 ** displayDecimals
+        ).toFixed(displayDecimals)
+      );
     }
 
-    $("lastUpdate").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    const trimmed =
+      cut.replace(/0+$/, "");
 
-    if (account) await refreshUser();
-  } catch (err) {
-    console.error(err);
-    $("lastUpdate").textContent = "Vault data unavailable";
+    return trimmed.length
+      ? `${a}.${trimmed}`
+      : a;
+  } catch {
+    return "-";
   }
 }
 
-async function refreshUser() {
-  if (!account || !vaultRead || !tokenRead) return;
-
-  try {
-    const [u, pendingRaw, walletRaw] = await Promise.all([
-      vaultRead.users(account),
-      vaultRead.pendingRewards(account),
-      tokenRead.balanceOf(account)
-    ]);
-
-    const stakedRaw = u[0];
-    const staked = Number(ethers.formatUnits(stakedRaw, decimals));
-    const pending = Number(ethers.formatUnits(pendingRaw, decimals));
-    const wallet = Number(ethers.formatUnits(walletRaw, decimals));
-
-    $("deposited").textContent = `${fmtTokenNumber(staked)} ALT`;
-    $("depositedUsd").textContent = fmtUsd(staked * altPriceUsd);
-
-    $("pending").textContent = `${fmtTokenNumber(pending, 8)} ALT`;
-    $("pendingUsd").textContent = fmtUsd(pending * altPriceUsd);
-
-    $("walletBalance").textContent = `Wallet balance: ${fmtTokenNumber(wallet)} ALT`;
-  } catch (err) {
-    console.error("User refresh failed", err);
-  }
+function shortAddress(address) {
+  return `${address.slice(
+    0,
+    6
+  )}…${address.slice(-4)}`;
 }
 
-async function switchToBase() {
-  if (!window.ethereum) throw new Error("No wallet detected");
-
-  const hex = "0x2105";
-  const current = await window.ethereum.request({ method: "eth_chainId" });
-
-  if (current.toLowerCase() === hex) return;
-
-  try {
-    await window.ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: hex }]
-    });
-  } catch (err) {
-    if (err.code !== 4902) throw err;
-
-    await window.ethereum.request({
-      method: "wallet_addEthereumChain",
-      params: [{
-        chainId: hex,
-        chainName: "Base",
-        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-        rpcUrls: ["https://mainnet.base.org"],
-        blockExplorerUrls: ["https://basescan.org"]
-      }]
-    });
-  }
+function setStatus(text) {
+  setText("status", text);
 }
 
-async function connectWallet() {
-  if (!window.ethereum) {
-    setStatus("No compatible browser wallet detected.", true);
+// ====== PRICE ======
+async function fetchDexScreenerPair(
+  chain,
+  pairAddress
+) {
+  const url =
+    `https://api.dexscreener.com/latest/dex/pairs/${chain}/${pairAddress}`;
+
+  const res = await fetch(
+    url,
+    {
+      cache: "no-store",
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      `DexScreener HTTP ${res.status}`
+    );
+  }
+
+  const data =
+    await res.json();
+
+  if (
+    !data ||
+    !data.pair
+  ) {
+    throw new Error(
+      "DexScreener: missing pair"
+    );
+  }
+
+  return data.pair;
+}
+
+async function updatePrice() {
+  const now = Date.now();
+
+  if (
+    now - lastPriceTs < 10_000 &&
+    cachedAltPriceUsd !== null
+  ) {
     return;
   }
 
   try {
-    setBusy(true);
-    setStatus("Connecting wallet…");
+    const altPair =
+      await fetchDexScreenerPair(
+        DEX_CHAIN,
+        PAIR_ALT_WETH
+      );
 
-    await switchToBase();
+    cachedAltPriceUsd =
+      parseFloat(
+        altPair.priceUsd
+      );
 
-    const browserProvider = new ethers.BrowserProvider(window.ethereum);
-    signer = await browserProvider.getSigner();
-    account = await signer.getAddress();
+    lastPriceTs = now;
 
-    const network = await browserProvider.getNetwork();
-    if (network.chainId !== BASE_CHAIN_ID) throw new Error("Please switch to Base");
+    setText(
+      "altPrice",
+      fmtUsd(
+        cachedAltPriceUsd
+      )
+    );
+  } catch (e) {
+    console.error(
+      "ALT price error:",
+      e
+    );
 
-    vaultWrite = new ethers.Contract(EVEREST_ADDRESS, VAULT_ABI, signer);
-    tokenWrite = new ethers.Contract(ALTITUDE_ADDRESS, TOKEN_ABI, signer);
-
-    $("btnConnect").textContent = shortAddress(account);
-    setStatus(`Connected ${shortAddress(account)}`);
-
-    await refreshVault();
-  } catch (err) {
-    console.error(err);
-    setStatus(err.shortMessage || err.message || "Wallet connection failed", true);
-  } finally {
-    setBusy(false);
+    if (
+      cachedAltPriceUsd === null
+    ) {
+      setText(
+        "altPrice",
+        "Unavailable"
+      );
+    }
   }
 }
 
-async function requireWallet() {
-  if (!account || !signer) {
-    await connectWallet();
+// ====== CONNECT ======
+async function ensureBase() {
+  if (!window.ethereum) {
+    return;
   }
-  if (!account || !signer) throw new Error("Wallet not connected");
-}
 
-function parseAmount(id) {
-  const value = $(id).value.trim();
-  if (!value || Number(value) <= 0) throw new Error("Enter an amount greater than zero");
-  return ethers.parseUnits(value, decimals);
-}
+  const current =
+    await window.ethereum.request({
+      method: "eth_chainId",
+    });
 
-async function deposit() {
+  if (
+    current.toLowerCase() ===
+    "0x2105"
+  ) {
+    return;
+  }
+
   try {
-    await requireWallet();
-    const amount = parseAmount("depositAmount");
-
-    setBusy(true);
-
-    const allowance = await tokenWrite.allowance(account, EVEREST_ADDRESS);
-    if (allowance < amount) {
-      setStatus("Approval required — confirm ALT approval in your wallet…");
-      const approveTx = await tokenWrite.approve(EVEREST_ADDRESS, amount);
-      await approveTx.wait();
+    await window.ethereum.request({
+      method:
+        "wallet_switchEthereumChain",
+      params: [
+        {
+          chainId: "0x2105",
+        },
+      ],
+    });
+  } catch (e) {
+    if (e.code !== 4902) {
+      throw e;
     }
 
-    setStatus("Confirm Everest deposit in your wallet…");
-    const tx = await vaultWrite.deposit(amount);
-    setStatus("Deposit submitted — waiting for confirmation…");
+    await window.ethereum.request({
+      method:
+        "wallet_addEthereumChain",
+      params: [
+        {
+          chainId: "0x2105",
+          chainName: "Base",
+          nativeCurrency: {
+            name: "Ether",
+            symbol: "ETH",
+            decimals: 18,
+          },
+          rpcUrls: [
+            "https://mainnet.base.org",
+          ],
+          blockExplorerUrls: [
+            "https://basescan.org",
+          ],
+        },
+      ],
+    });
+  }
+}
+
+async function connect() {
+  if (!window.ethereum) {
+    alert(
+      "No wallet found. Install MetaMask / Coinbase Wallet."
+    );
+
+    return;
+  }
+
+  try {
+    await ensureBase();
+
+    provider =
+      new ethers.BrowserProvider(
+        window.ethereum
+      );
+
+    await provider.send(
+      "eth_requestAccounts",
+      []
+    );
+
+    signer =
+      await provider.getSigner();
+
+    user =
+      await signer.getAddress();
+
+    // Same pattern as the original working USDC dApp:
+    // reads and writes use the connected wallet provider.
+    farm =
+      new ethers.Contract(
+        FARM_ADDRESS,
+        farmABI,
+        signer
+      );
+
+    alt =
+      new ethers.Contract(
+        ALT,
+        erc20ABI,
+        signer
+      );
+
+    tokenDecimals =
+      Number(
+        await alt.decimals()
+      );
+
+    setText(
+      "btnConnect",
+      shortAddress(user)
+    );
+
+    setStatus(
+      `Connected: ${shortAddress(
+        user
+      )}`
+    );
+
+    await Promise.all([
+      updatePrice(),
+      refresh(),
+    ]);
+
+    if (refreshTimer) {
+      clearInterval(
+        refreshTimer
+      );
+    }
+
+    refreshTimer =
+      setInterval(
+        async () => {
+          await updatePrice();
+          await refresh();
+        },
+        REFRESH_MS
+      );
+  } catch (e) {
+    console.error(
+      "Connect error:",
+      e
+    );
+
+    setStatus(
+      e.shortMessage ||
+        e.message ||
+        "Connection failed"
+    );
+  }
+}
+
+// ====== REFRESH ======
+async function refresh() {
+  if (
+    !farm ||
+    !user
+  ) {
+    return;
+  }
+
+  try {
+    const [
+      u,
+      pending,
+      totalStaked,
+      walletAlt,
+      rewardBal,
+      allocatedBal,
+      availableBal,
+      dripDay,
+      dripYear,
+      solvent,
+    ] =
+      await Promise.all([
+        farm.users(user),
+        farm.pendingRewards(
+          user
+        ),
+        farm.totalStaked(),
+        alt.balanceOf(user),
+        farm.rewardBalance(),
+        farm.allocatedBalance(),
+        farm.availableRewards(),
+        farm.dailyDripEstimate(),
+        farm.yearlyDripEstimate(),
+        farm.isSolvent(),
+      ]);
+
+    // Same named-return style as the old USDC dApp.
+    const userStaked =
+      u.amount;
+
+    // ===== USER =====
+    const stakedText =
+      fmtUnitsSmart(
+        userStaked,
+        tokenDecimals,
+        8
+      );
+
+    const pendingText =
+      fmtUnitsSmart(
+        pending,
+        tokenDecimals,
+        8
+      );
+
+    const walletText =
+      fmtUnitsSmart(
+        walletAlt,
+        tokenDecimals,
+        8
+      );
+
+    setText(
+      "deposited",
+      `${stakedText} ALT`
+    );
+
+    setText(
+      "pending",
+      `${pendingText} ALT`
+    );
+
+    setText(
+      "walletBalance",
+      `Wallet balance: ${walletText} ALT`
+    );
+
+    // ===== VAULT =====
+    const reserveText =
+      fmtUnitsSmart(
+        availableBal,
+        tokenDecimals,
+        8
+      );
+
+    const totalStakedText =
+      fmtUnitsSmart(
+        totalStaked,
+        tokenDecimals,
+        8
+      );
+
+    const dripDayText =
+      fmtUnitsSmart(
+        dripDay,
+        tokenDecimals,
+        8
+      );
+
+    setText(
+      "reserve",
+      `${reserveText} ALT`
+    );
+
+    setText(
+      "vaultTvlAlt",
+      `${totalStakedText} ALT`
+    );
+
+    setText(
+      "dailyRewards",
+      `${dripDayText} ALT`
+    );
+
+    // ===== USD VALUES =====
+    const p =
+      cachedAltPriceUsd;
+
+    if (
+      p !== null &&
+      Number.isFinite(p)
+    ) {
+      const stakedNum =
+        parseFloat(
+          ethers.formatUnits(
+            userStaked,
+            tokenDecimals
+          )
+        );
+
+      const pendingNum =
+        parseFloat(
+          ethers.formatUnits(
+            pending,
+            tokenDecimals
+          )
+        );
+
+      const reserveNum =
+        parseFloat(
+          ethers.formatUnits(
+            availableBal,
+            tokenDecimals
+          )
+        );
+
+      const totalStakedNum =
+        parseFloat(
+          ethers.formatUnits(
+            totalStaked,
+            tokenDecimals
+          )
+        );
+
+      const dripDayNum =
+        parseFloat(
+          ethers.formatUnits(
+            dripDay,
+            tokenDecimals
+          )
+        );
+
+      const dripYearNum =
+        parseFloat(
+          ethers.formatUnits(
+            dripYear,
+            tokenDecimals
+          )
+        );
+
+      setText(
+        "depositedUsd",
+        fmtUsd(
+          stakedNum * p
+        )
+      );
+
+      setText(
+        "pendingUsd",
+        fmtUsd(
+          pendingNum * p
+        )
+      );
+
+      setText(
+        "reserveUsd",
+        fmtUsd(
+          reserveNum * p
+        )
+      );
+
+      setText(
+        "vaultTvlUsd",
+        fmtUsd(
+          totalStakedNum * p
+        )
+      );
+
+      setText(
+        "dailyRewardsUsd",
+        fmtUsd(
+          dripDayNum * p
+        )
+      );
+
+      // USD-based APR:
+      //
+      // annual reward value in USD
+      // divided by
+      // current total staked value in USD
+      //
+      // Because both stake and reward asset are ALT,
+      // the ALT price mathematically cancels out.
+      // But displaying the USD values makes the APR
+      // easier for users to understand.
+      const tvlUsd =
+        totalStakedNum * p;
+
+      const annualRewardsUsd =
+        dripYearNum * p;
+
+      const apr =
+        tvlUsd > 0
+          ? (
+              annualRewardsUsd /
+              tvlUsd
+            ) * 100
+          : null;
+
+      setText(
+        "apr",
+        fmtPct(apr)
+      );
+
+      if (apr !== null) {
+        setText(
+          "aprUsdBasis",
+          `${fmtUsd(
+            annualRewardsUsd
+          )}/yr rewards ÷ ${fmtUsd(
+            tvlUsd
+          )} staked`
+        );
+      } else {
+        setText(
+          "aprUsdBasis",
+          "No ALT currently staked"
+        );
+      }
+    } else {
+      setText(
+        "depositedUsd",
+        "-"
+      );
+
+      setText(
+        "pendingUsd",
+        "-"
+      );
+
+      setText(
+        "reserveUsd",
+        "-"
+      );
+
+      setText(
+        "vaultTvlUsd",
+        "-"
+      );
+
+      setText(
+        "dailyRewardsUsd",
+        "-"
+      );
+
+      // Price-feed fallback:
+      // contract already exposes current APR.
+      const aprBps =
+        await farm.currentAprBps();
+
+      setText(
+        "apr",
+        fmtPct(
+          Number(aprBps) /
+            100
+        )
+      );
+
+      setText(
+        "aprUsdBasis",
+        "ALT price temporarily unavailable"
+      );
+    }
+
+    if (!solvent) {
+      setStatus(
+        "WARNING: vault reports insolvent"
+      );
+    } else {
+      setStatus(
+        `Connected: ${shortAddress(
+          user
+        )}`
+      );
+    }
+
+    setText(
+      "lastUpdate",
+      `Updated ${new Date().toLocaleTimeString()}`
+    );
+
+    console.debug(
+      "Everest refresh",
+      {
+        user,
+        staked:
+          ethers.formatUnits(
+            userStaked,
+            tokenDecimals
+          ),
+        pending:
+          ethers.formatUnits(
+            pending,
+            tokenDecimals
+          ),
+        totalStaked:
+          ethers.formatUnits(
+            totalStaked,
+            tokenDecimals
+          ),
+        availableRewards:
+          ethers.formatUnits(
+            availableBal,
+            tokenDecimals
+          ),
+        rewardBalance:
+          ethers.formatUnits(
+            rewardBal,
+            tokenDecimals
+          ),
+        allocatedRewards:
+          ethers.formatUnits(
+            allocatedBal,
+            tokenDecimals
+          ),
+        solvent,
+      }
+    );
+  } catch (e) {
+    console.error(
+      "Refresh error:",
+      e
+    );
+
+    setStatus(
+      "Refresh failed — check console"
+    );
+  }
+}
+
+// ====== TX HELPERS ======
+async function approveIfNeeded(
+  amountWei
+) {
+  const allowance =
+    await alt.allowance(
+      user,
+      FARM_ADDRESS
+    );
+
+  if (
+    allowance >= amountWei
+  ) {
+    return;
+  }
+
+  setStatus(
+    "Approve ALT in your wallet..."
+  );
+
+  const tx =
+    await alt.approve(
+      FARM_ADDRESS,
+      amountWei
+    );
+
+  await tx.wait();
+}
+
+async function stake() {
+  if (
+    !farm ||
+    !user
+  ) {
+    return alert(
+      "Connect wallet first"
+    );
+  }
+
+  const input =
+    $("depositAmount");
+
+  const val =
+    input
+      ? input.value
+      : "";
+
+  if (
+    !val ||
+    Number(val) <= 0
+  ) {
+    return alert(
+      "Enter stake amount"
+    );
+  }
+
+  try {
+    const amountWei =
+      ethers.parseUnits(
+        val,
+        tokenDecimals
+      );
+
+    await approveIfNeeded(
+      amountWei
+    );
+
+    setStatus(
+      "Confirm deposit..."
+    );
+
+    const tx =
+      await farm.deposit(
+        amountWei
+      );
+
     await tx.wait();
 
-    $("depositAmount").value = "";
-    setStatus("Deposit confirmed.");
-    await refreshVault();
-  } catch (err) {
-    console.error(err);
-    setStatus(err.shortMessage || err.reason || err.message || "Deposit failed", true);
-  } finally {
-    setBusy(false);
+    if (input) {
+      input.value = "";
+    }
+
+    setStatus(
+      "Deposit confirmed"
+    );
+
+    await refresh();
+  } catch (e) {
+    console.error(
+      "Deposit error:",
+      e
+    );
+
+    setStatus(
+      e.shortMessage ||
+        e.message ||
+        "Deposit failed"
+    );
   }
 }
 
 async function withdraw() {
+  if (
+    !farm ||
+    !user
+  ) {
+    return alert(
+      "Connect wallet first"
+    );
+  }
+
+  const input =
+    $("withdrawAmount");
+
+  const val =
+    input
+      ? input.value
+      : "";
+
+  if (
+    !val ||
+    Number(val) <= 0
+  ) {
+    return alert(
+      "Enter withdraw amount"
+    );
+  }
+
   try {
-    await requireWallet();
-    const amount = parseAmount("withdrawAmount");
+    const amountWei =
+      ethers.parseUnits(
+        val,
+        tokenDecimals
+      );
 
-    setBusy(true);
-    setStatus("Confirm withdrawal in your wallet…");
+    setStatus(
+      "Confirm withdrawal..."
+    );
 
-    const tx = await vaultWrite.withdraw(amount);
-    setStatus("Withdrawal submitted — waiting for confirmation…");
+    const tx =
+      await farm.withdraw(
+        amountWei
+      );
+
     await tx.wait();
 
-    $("withdrawAmount").value = "";
-    setStatus("Withdrawal confirmed. Pending rewards were harvested.");
-    await refreshVault();
-  } catch (err) {
-    console.error(err);
-    setStatus(err.shortMessage || err.reason || err.message || "Withdrawal failed", true);
-  } finally {
-    setBusy(false);
+    if (input) {
+      input.value = "";
+    }
+
+    setStatus(
+      "Withdrawal confirmed"
+    );
+
+    await refresh();
+  } catch (e) {
+    console.error(
+      "Withdraw error:",
+      e
+    );
+
+    setStatus(
+      e.shortMessage ||
+        e.message ||
+        "Withdrawal failed"
+    );
   }
 }
 
 async function claim() {
+  if (
+    !farm ||
+    !user
+  ) {
+    return alert(
+      "Connect wallet first"
+    );
+  }
+
   try {
-    await requireWallet();
+    setStatus(
+      "Confirm claim..."
+    );
 
-    setBusy(true);
-    setStatus("Confirm reward claim in your wallet…");
+    const tx =
+      await farm.claim();
 
-    const tx = await vaultWrite.claim();
-    setStatus("Claim submitted — waiting for confirmation…");
     await tx.wait();
 
-    setStatus("ALT rewards claimed.");
-    await refreshVault();
-  } catch (err) {
-    console.error(err);
-    setStatus(err.shortMessage || err.reason || err.message || "Claim failed", true);
-  } finally {
-    setBusy(false);
+    setStatus(
+      "ALT rewards claimed"
+    );
+
+    await refresh();
+  } catch (e) {
+    console.error(
+      "Claim error:",
+      e
+    );
+
+    setStatus(
+      e.shortMessage ||
+        e.message ||
+        "Claim failed"
+    );
   }
 }
 
 async function updatePool() {
+  if (
+    !farm ||
+    !user
+  ) {
+    return alert(
+      "Connect wallet first"
+    );
+  }
+
   try {
-    await requireWallet();
+    setStatus(
+      "Confirm pool update..."
+    );
 
-    setBusy(true);
-    setStatus("Confirm pool update in your wallet…");
+    const tx =
+      await farm.updatePool();
 
-    const tx = await vaultWrite.updatePool();
-    setStatus("Update submitted — waiting for confirmation…");
     await tx.wait();
 
-    setStatus("Everest pool updated.");
-    await refreshVault();
-  } catch (err) {
-    console.error(err);
-    setStatus(err.shortMessage || err.reason || err.message || "Update failed", true);
-  } finally {
-    setBusy(false);
+    setStatus(
+      "Pool updated"
+    );
+
+    await refresh();
+  } catch (e) {
+    console.error(
+      "Update error:",
+      e
+    );
+
+    setStatus(
+      e.shortMessage ||
+        e.message ||
+        "Update failed"
+    );
   }
 }
 
-function bindEvents() {
-  $("btnConnect").addEventListener("click", connectWallet);
-  $("btnDeposit").addEventListener("click", deposit);
-  $("btnWithdraw").addEventListener("click", withdraw);
-  $("btnClaim").addEventListener("click", claim);
-  $("btnUpdate").addEventListener("click", updatePool);
+// ====== BIND UI ======
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+    const btnConnect =
+      $("btnConnect");
 
-  if (!TEST_MODE) {
-    const banner = $("testBanner");
-    if (banner) banner.remove();
+    const btnDeposit =
+      $("btnDeposit");
+
+    const btnWithdraw =
+      $("btnWithdraw");
+
+    const btnClaim =
+      $("btnClaim");
+
+    const btnUpdate =
+      $("btnUpdate");
+
+    if (btnConnect) {
+      btnConnect.onclick =
+        connect;
+    }
+
+    if (btnDeposit) {
+      btnDeposit.onclick =
+        stake;
+    }
+
+    if (btnWithdraw) {
+      btnWithdraw.onclick =
+        withdraw;
+    }
+
+    if (btnClaim) {
+      btnClaim.onclick =
+        claim;
+    }
+
+    if (btnUpdate) {
+      btnUpdate.onclick =
+        updatePool;
+    }
+
+    if (
+      window.ethereum?.on
+    ) {
+      window.ethereum.on(
+        "accountsChanged",
+        () =>
+          window.location.reload()
+      );
+
+      window.ethereum.on(
+        "chainChanged",
+        () =>
+          window.location.reload()
+      );
+    }
   }
-
-  if (window.ethereum?.on) {
-    window.ethereum.on("accountsChanged", async (accounts) => {
-      if (!accounts.length) {
-        account = undefined;
-        signer = undefined;
-        vaultWrite = undefined;
-        tokenWrite = undefined;
-        $("btnConnect").textContent = "Connect Wallet";
-        $("deposited").textContent = "0 ALT";
-        $("pending").textContent = "0 ALT";
-        $("walletBalance").textContent = "Wallet balance: — ALT";
-        setStatus("Not connected");
-        return;
-      }
-
-      await connectWallet();
-    });
-
-    window.ethereum.on("chainChanged", () => window.location.reload());
-  }
-}
-
-async function start() {
-  bindEvents();
-
-  try {
-    await initReadContracts();
-    await refreshVault();
-    setInterval(refreshVault, 30_000);
-  } catch (err) {
-    console.error(err);
-    setStatus(`Dapp setup error: ${err.message}`, true);
-  }
-}
-
-window.addEventListener("DOMContentLoaded", start);
+);
