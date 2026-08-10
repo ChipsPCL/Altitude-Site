@@ -223,7 +223,7 @@ async function refreshUser() {
       tokenRead.balanceOf(account)
     ]);
 
-    const stakedRaw = u.amount;
+    const stakedRaw = u[0];
     const staked = Number(ethers.formatUnits(stakedRaw, decimals));
     const pending = Number(ethers.formatUnits(pendingRaw, decimals));
     const wallet = Number(ethers.formatUnits(walletRaw, decimals));
@@ -231,7 +231,7 @@ async function refreshUser() {
     $("deposited").textContent = `${fmtTokenNumber(staked)} ALT`;
     $("depositedUsd").textContent = fmtUsd(staked * altPriceUsd);
 
-    $("pending").textContent = `${fmtTokenNumber(pending, 4)} ALT`;
+    $("pending").textContent = `${fmtTokenNumber(pending, 8)} ALT`;
     $("pendingUsd").textContent = fmtUsd(pending * altPriceUsd);
 
     $("walletBalance").textContent = `Wallet balance: ${fmtTokenNumber(wallet)} ALT`;
