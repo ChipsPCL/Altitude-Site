@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Altitude Everest ALT Vault</title>
+  <meta name="description" content="Stake ALTITUDE in the Everest Vault and earn ALTITUDE rewards funded by project activity and reward top-ups." />
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #030814;
+      --line: rgba(47, 215, 255, 0.22);
+      --cyan: #27d7ff;
+      --blue: #0b84ff;
+      --text: #f5fbff;
+      --muted: #9fb8ca;
+      --radius: 22px;
+      --shadow: 0 0 34px rgba(23, 171, 255, 0.14);
+      --max: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 75% 0%, rgba(0, 140, 255, 0.22), transparent 30rem),
+        radial-gradient(circle at 20% 8%, rgba(39, 215, 255, 0.10), transparent 24rem),
+        linear-gradient(180deg, #02050d 0%, var(--bg) 48%, #02050d 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(39, 215, 255, 0.032) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(39, 215, 255, 0.032) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: linear-gradient(to bottom, black, transparent 84%);
+      z-index: -1;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+
+    .wrap {
+      width: min(var(--max), calc(100% - 28px));
+      margin: 0 auto;
+    }
+
+    .glass {
+      background: linear-gradient(180deg, rgba(11, 25, 53, 0.82), rgba(5, 13, 28, 0.76));
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      border-radius: var(--radius);
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: rgba(2, 5, 13, 0.72);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(39, 215, 255, 0.14);
+    }
+
+    .nav {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 950;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.95rem;
+    }
+
+    .brand img {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      object-fit: cover;
+      box-shadow: 0 0 18px rgba(39, 215, 255, 0.30);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .navlinks {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.86rem;
+    }
+
+    .navlinks a:hover { color: var(--cyan); }
+
+    .btn,
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border: 1px solid rgba(39, 215, 255, 0.34);
+      background: linear-gradient(135deg, rgba(39, 215, 255, 0.92), rgba(11, 132, 255, 0.88));
+      color: #001018;
+      border-radius: 999px;
+      font-weight: 950;
+      letter-spacing: 0.02em;
+      box-shadow: 0 0 22px rgba(39, 215, 255, 0.16);
+      transition: transform 0.18s ease, border-color 0.18s ease, filter 0.18s ease;
+      cursor: pointer;
+      width: auto;
+      font-family: inherit;
+      font-size: 0.92rem;
+      border-style: solid;
+      white-space: nowrap;
+    }
+
+    .btn.secondary,
+    button.secondary {
+      background: rgba(255,255,255,0.045);
+      color: var(--text);
+    }
+
+    .btn:hover,
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(39, 215, 255, 0.72);
+      filter: brightness(1.05);
+    }
+
+    button { width: 100%; }
+
+    main { padding: 14px 0 34px; }
+
+    .app-top {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 12px;
+      align-items: stretch;
+      margin-bottom: 12px;
+    }
+
+    .intro-card {
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      min-height: 118px;
+    }
+
+    .product-logo {
+      width: 76px;
+      height: 76px;
+      border-radius: 20px;
+      object-fit: cover;
+      border: 1px solid rgba(39, 215, 255, 0.16);
+      box-shadow: 0 0 24px rgba(39, 215, 255, 0.15);
+      background: rgba(255,255,255,0.04);
+      flex: 0 0 auto;
+    }
+
+    .eyebrow {
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-weight: 900;
+      font-size: 0.68rem;
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.75rem, 3.6vw, 3rem);
+      line-height: 0.95;
+      letter-spacing: -0.055em;
+      text-transform: uppercase;
+    }
+
+    h1 span {
+      color: var(--cyan);
+      text-shadow: 0 0 24px rgba(39, 215, 255, 0.38);
+    }
+
+    .lead {
+      color: #c7d8e8;
+      font-size: 0.9rem;
+      line-height: 1.42;
+      margin: 8px 0 0;
+      max-width: 720px;
+    }
+
+    .connect-card {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 118px;
+    }
+
+    .connect-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.11em;
+    }
+
+    .connect-title img {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      object-fit: cover;
+      box-shadow: 0 0 16px rgba(39, 215, 255, 0.24);
+    }
+
+    .status-line {
+      margin-top: 8px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      overflow-wrap: anywhere;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .stat {
+      padding: 12px;
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .stat .label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.10em;
+      font-weight: 900;
+      font-size: 0.66rem;
+    }
+
+    .stat .value {
+      margin-top: 7px;
+      font-size: clamp(1.05rem, 1.8vw, 1.42rem);
+      font-weight: 950;
+      letter-spacing: -0.04em;
+      overflow-wrap: anywhere;
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .box { padding: 14px; }
+
+    .box h2 {
+      margin: 0 0 9px;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr 126px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input {
+      width: 100%;
+      min-height: 42px;
+      padding: 0 13px;
+      border-radius: 999px;
+      border: 1px solid rgba(39, 215, 255, 0.22);
+      background: rgba(6, 10, 18, 0.58);
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+      font-size: 0.92rem;
+    }
+
+    input:focus {
+      border-color: rgba(39, 215, 255, 0.72);
+      box-shadow: 0 0 0 3px rgba(45, 212, 255, 0.12);
+    }
+
+    input::placeholder { color: rgba(159, 184, 202, 0.72); }
+
+    .small {
+      font-size: 0.76rem;
+      color: var(--muted);
+      margin-top: 7px;
+      line-height: 1.34;
+    }
+
+    .center { text-align: center; }
+
+    .notice {
+      padding: 10px 12px;
+      border-radius: 18px;
+      background: rgba(255, 209, 102, 0.08);
+      border: 1px solid rgba(255, 209, 102, 0.22);
+      color: #ffe2a3;
+      line-height: 1.38;
+      font-size: 0.78rem;
+      margin-top: 10px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .footer-links a:hover { color: var(--cyan); }
+
+    footer {
+      padding: 22px 0;
+      color: var(--muted);
+      border-top: 1px solid rgba(39, 215, 255, 0.12);
+      font-size: 0.86rem;
+    }
+
+    footer .wrap {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    @media (max-width: 900px) {
+      .navlinks { display: none; }
+
+      .app-top,
+      .action-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .intro-card {
+        min-height: unset;
+      }
+
+      .connect-card {
+        min-height: unset;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .wrap { width: min(var(--max), calc(100% - 20px)); }
+      main { padding-top: 10px; }
+
+      .brand span { display: none; }
+
+      .intro-card {
+        align-items: flex-start;
+        padding: 14px;
+      }
+
+      .product-logo {
+        width: 58px;
+        height: 58px;
+        border-radius: 17px;
+      }
+
+      h1 { font-size: 1.9rem; }
+
+      .lead {
+        font-size: 0.84rem;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .stat {
+        min-height: 74px;
+        padding: 10px;
+      }
+
+      .input-row {
+        grid-template-columns: 1fr;
+      }
+
+      .notice {
+        font-size: 0.74rem;
+      }
+    }
+
+    .test-banner {
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 209, 102, 0.34);
+      background: rgba(255, 209, 102, 0.10);
+      color: #ffe2a3;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      text-align: center;
+      font-weight: 800;
+    }
+
+    .stat .small {
+      margin-top: 4px;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+      transform: none !important;
+      filter: none !important;
+    }
+
+  </style>
+</head>
+
+<body>
+  <header>
+    <nav class="wrap nav">
+      <a class="brand" href="../">
+        <img src="assets/altitude-logo.jpg" alt="Altitude logo">
+        <span>Altitude</span>
+      </a>
+
+      <div class="navlinks">
+        <a href="https://www.altitudetoken.com/">Website</a>
+        <a href="https://thealtitudeproject.gitbook.io/docs" target="_blank" rel="noopener noreferrer">Docs</a>
+        <a href="https://thealtitudeproject.gitbook.io/docs/everest-vault/overview" target="_blank" rel="noopener noreferrer">Everest Docs</a>
+        <a href="https://t.me/AltitudeProject" target="_blank" rel="noopener noreferrer">Telegram</a>
+      </div>
+
+      <a class="btn secondary" href="https://thealtitudeproject.gitbook.io/docs/everest-vault/overview" target="_blank" rel="noopener noreferrer">
+        Docs
+      </a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <div id="testBanner" class="test-banner">
+        TEST DEPLOYMENT — Use small amounts only. This contract will be replaced before public launch.
+      </div>
+      <section class="app-top">
+        <div class="intro-card glass">
+          <img class="product-logo" src="assets/everest-vault-logo.png" alt="Everest Vault logo">
+
+          <div>
+            <div class="eyebrow">Altitude DeFi Dapp</div>
+            <h1>Everest <span>ALT Vault</span></h1>
+            <p class="lead">
+              Stake ALTITUDE and earn ALTITUDE rewards funded by project activity, transaction rewards and optional ecosystem reward boosts.
+            </p>
+          </div>
+        </div>
+
+        <div class="connect-card glass">
+          <div class="connect-title">
+            <span>Wallet</span>
+            <img src="assets/altitude-logo.jpg" alt="Altitude logo">
+          </div>
+
+          <button id="btnConnect">Connect Wallet</button>
+          <div class="status-line" id="status">Not connected</div>
+          <div class="status-line" id="lastUpdate">—</div>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        <div class="stat glass">
+          <div class="label">Your Staked ALT</div>
+          <div class="value" id="deposited">0</div>
+          <div class="small" id="depositedUsd">$0.00</div>
+        </div>
+
+        <div class="stat glass">
+          <div class="label">Pending ALT</div>
+          <div class="value" id="pending">0</div>
+          <div class="small" id="pendingUsd">$0.00</div>
+        </div>
+
+        <div class="stat glass">
+          <div class="label">Reward Reserve</div>
+          <div class="value" id="reserve">0</div>
+          <div class="small" id="reserveUsd">$0.00</div>
+        </div>
+
+        <div class="stat glass">
+          <div class="label">Live APR</div>
+          <div class="value" id="apr">-</div>
+          <div class="small" id="aprUsdBasis">USD value basis</div>
+        </div>
+      </section>
+
+      <div class="notice" style="margin-top:0;margin-bottom:10px;">
+        <strong>Vault TVL:</strong> <span id="vaultTvlAlt">0 ALT</span>
+        (<span id="vaultTvlUsd">$0.00</span>)
+        &nbsp;•&nbsp;
+        <strong>Daily rewards now:</strong> <span id="dailyRewards">0 ALT</span>
+        (<span id="dailyRewardsUsd">$0.00</span>)
+        &nbsp;•&nbsp;
+        <strong>ALT price:</strong> <span id="altPrice">Loading…</span>
+      </div>
+
+      <section class="action-grid">
+        <div class="box glass">
+          <h2>Deposit ALTITUDE</h2>
+
+          <div class="input-row">
+            <input type="number" id="depositAmount" placeholder="Amount of ALTITUDE" />
+            <button id="btnDeposit">Deposit</button>
+          </div>
+
+          <div class="small" id="walletBalance">Wallet balance: — ALT</div>
+
+          <div class="small">
+            1% Everest deposit fee. Your net staked ALT earns a share of the vault reward drip.
+          </div>
+        </div>
+
+        <div class="box glass">
+          <h2>Withdraw ALTITUDE</h2>
+
+          <div class="input-row">
+            <input type="number" id="withdrawAmount" placeholder="Amount of ALTITUDE" />
+            <button id="btnWithdraw">Withdraw</button>
+          </div>
+
+          <div class="small">
+            2% Everest withdrawal fee. Pending rewards are harvested automatically before withdrawal.
+          </div>
+        </div>
+      </section>
+
+      <section class="action-grid">
+        <div class="box glass">
+          <h2>Claim ALTITUDE</h2>
+
+          <button id="btnClaim">Claim Rewards</button>
+
+          <div class="small center">
+            Claim triggers a pool update before payout. No Everest claim fee.
+          </div>
+        </div>
+
+        <div class="box glass">
+          <h2>Update Pool</h2>
+
+          <button id="btnUpdate" class="secondary">Update Pool</button>
+
+          <div class="small center">
+            Optional: refreshes the vault accounting when there is no user activity.
+          </div>
+        </div>
+      </section>
+
+      <div class="notice">
+        Crypto and DeFi products are high risk. Rewards, ALT reserve levels, token price,
+        liquidity, and contract balances are not guaranteed.
+      </div>
+
+      <div class="footer-links">
+        <a href="https://www.altitudetoken.com/">Website</a>
+        <span>•</span>
+        <a href="https://thealtitudeproject.gitbook.io/docs" target="_blank" rel="noopener noreferrer">Full Docs</a>
+        <span>•</span>
+        <a href="https://t.me/AltitudeProject" target="_blank" rel="noopener noreferrer">Telegram</a>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <strong>Altitude Project</strong>
+      <span>Built on Base. Everest ALT Vault.</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
