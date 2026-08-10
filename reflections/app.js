@@ -31,7 +31,7 @@
 
   // Public Base RPC: fine for testing/light traffic.
   // A dedicated archive-capable Base RPC is recommended for production.
-  const RPC_URL = "https://mainnet.base.org";
+  const RPC_URL = "https://rpcfree.com/base-rpc";
 
   const BASE_CHAIN_ID_HEX = "0x2105";
   const APPROX_BLOCK_SECONDS = 2n;
