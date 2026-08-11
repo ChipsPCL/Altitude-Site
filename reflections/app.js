@@ -31,7 +31,7 @@
 
   // Public Base RPC: fine for testing/light traffic.
   // A dedicated archive-capable Base RPC is recommended for production.
-  const RPC_URL = "const RPC_URL = "https://base-mainnet.g.alchemy.com/v2/alch__zE5qmVQGBJgMK0e_KRAm";";
+  const RPC_URL = "const RPC_URL = "https://base-mainnet.g.alchemy.com/v2/alch__zE5qmVQGBJgMK0e_KRAm";
 
   const BASE_CHAIN_ID_HEX = "0x2105";
   const APPROX_BLOCK_SECONDS = 2n;
