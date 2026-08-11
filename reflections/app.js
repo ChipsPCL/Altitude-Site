@@ -1,5 +1,5 @@
-// app.js — Altitude Reflections Dashboard V2
-// Lightweight /reflections/ version
+// app.js — Altitude Reflections Dashboard V3
+// Alchemy Transfers API version
 //
 // ALT:
 // 0x90678C02823b21772fa7e91b27ee70490257567B
@@ -7,9 +7,8 @@
 // Hidden 100 ALT benchmark wallet:
 // 0x2Dc03F9e6E3CE6DAdBb472442f82f13B3F3CF767
 //
-// IMPORTANT:
-// At Restored launch, replace RESTORED_START_BLOCK = 0n
-// with the exact Base block where reflections are activated.
+// This version does NOT use eth_getLogs.
+// Wallet transfer history comes from alchemy_getAssetTransfers.
 
 // ============================================================
 // CONFIG
@@ -24,22 +23,20 @@ const REFERENCE_WALLET =
 const RPC_URL =
   "https://base-mainnet.g.alchemy.com/v2/alch__zE5qmVQGBJgMK0e_KRAm";
 
-// When Restored goes live, replace 0n with the actual Base block.
+// At Restored launch:
+//
+// Change this from 0n to the exact Base block where
+// the restored reflection system goes live.
+//
+// Until then, the dApp automatically uses the first ALT
+// transfer into the benchmark wallet as the test baseline.
+
 const RESTORED_START_BLOCK = 0n;
-
-// Temporary test mode:
-// how far back we look for the benchmark wallet's first ALT transfer.
-const AUTO_SEED_SCAN_DAYS = 90n;
-
-// Base averages roughly 2 second blocks.
-const APPROX_BLOCK_SECONDS = 2n;
 
 const BASE_CHAIN_ID_HEX = "0x2105";
 
-const TRANSFER_TOPIC =
-  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-
 const BALANCE_OF_SELECTOR = "70a08231";
+
 const DECIMALS_SELECTOR = "313ce567";
 
 
@@ -50,14 +47,17 @@ const DECIMALS_SELECTOR = "313ce567";
 let tokenDecimals = 18;
 
 let latestBlock = 0n;
+
 let trackingStartBlock = 0n;
 
 let connectedAddress = null;
 
 let walletProvider = null;
 
-// Historical balance cache.
-// Key = address:block
+
+// Cache historical balances so the same block is not
+// repeatedly requested during 7D / 30D / 1Y calculations.
+
 const balanceCache = new Map();
 
 
@@ -116,20 +116,19 @@ function setConnectButtons(
   text,
   disabled = false
 ) {
-  const ids = [
-    "btnConnect",
-    "btnConnect2"
-  ];
+  for (
+    const id of
+    ["btnConnect", "btnConnect2"]
+  ) {
+    const button = $(id);
 
-  for (const id of ids) {
-    const btn = $(id);
-
-    if (!btn) {
+    if (!button) {
       continue;
     }
 
-    btn.textContent = text;
-    btn.disabled = disabled;
+    button.textContent = text;
+
+    button.disabled = disabled;
   }
 }
 
@@ -151,11 +150,20 @@ function formatPercent(value) {
     return "0.00%";
   }
 
-  if (Math.abs(value) < 0.01) {
-    return value.toFixed(4) + "%";
+  if (
+    Math.abs(value) <
+    0.01
+  ) {
+    return (
+      value.toFixed(4) +
+      "%"
+    );
   }
 
-  return value.toFixed(2) + "%";
+  return (
+    value.toFixed(2) +
+    "%"
+  );
 }
 
 
@@ -176,7 +184,8 @@ function formatAlt(
   }
 
   const tiny =
-    1 / (10 ** maxDecimals);
+    1 /
+    (10 ** maxDecimals);
 
   if (
     value > 0 &&
@@ -203,7 +212,7 @@ function formatAlt(
 
 
 // ============================================================
-// BASIC RPC
+// ALCHEMY RPC
 // ============================================================
 
 async function rpc(
@@ -223,20 +232,37 @@ async function rpc(
 
         body: JSON.stringify({
           jsonrpc: "2.0",
+
           id:
             Date.now() +
             Math.floor(
-              Math.random() * 1000
+              Math.random() *
+              10000
             ),
+
           method,
+
           params
         })
       }
     );
 
   if (!response.ok) {
+    let detail = "";
+
+    try {
+      detail =
+        await response.text();
+    } catch {}
+
+    console.error(
+      "Alchemy HTTP error:",
+      response.status,
+      detail
+    );
+
     throw new Error(
-      `Base RPC HTTP ${response.status}`
+      `Alchemy HTTP ${response.status}`
     );
   }
 
@@ -244,15 +270,24 @@ async function rpc(
     await response.json();
 
   if (json.error) {
+    console.error(
+      "Alchemy RPC error:",
+      json.error
+    );
+
     throw new Error(
       json.error.message ||
-      "Base RPC error"
+      "Alchemy RPC error"
     );
   }
 
   return json.result;
 }
 
+
+// ============================================================
+// BASIC CONTRACT READS
+// ============================================================
 
 function blockTag(block) {
   return (
@@ -262,18 +297,9 @@ function blockTag(block) {
 }
 
 
-function addressTopic(address) {
-  return (
-    "0x" +
-    address
-      .toLowerCase()
-      .replace(/^0x/, "")
-      .padStart(64, "0")
-  );
-}
-
-
-function encodeBalanceOf(address) {
+function encodeBalanceOf(
+  address
+) {
   return (
     "0x" +
     BALANCE_OF_SELECTOR +
@@ -297,17 +323,14 @@ async function ethCall(
         data
       },
 
-      typeof block === "bigint"
+      typeof block ===
+      "bigint"
         ? blockTag(block)
         : block
     ]
   );
 }
 
-
-// ============================================================
-// BLOCK / TOKEN READS
-// ============================================================
 
 async function getLatestBlock() {
   const raw =
@@ -332,10 +355,13 @@ async function getTokenDecimals() {
       );
 
     tokenDecimals =
-      Number(BigInt(raw));
+      Number(
+        BigInt(raw)
+      );
+
   } catch (error) {
     console.warn(
-      "Could not read decimals. Using 18.",
+      "Decimals lookup failed. Using 18.",
       error
     );
 
@@ -357,7 +383,8 @@ async function getBalanceRaw(
   block = "latest"
 ) {
   const cacheKey =
-    typeof block === "bigint"
+    typeof block ===
+    "bigint"
       ? (
           address.toLowerCase() +
           ":" +
@@ -367,7 +394,9 @@ async function getBalanceRaw(
 
   if (
     cacheKey &&
-    balanceCache.has(cacheKey)
+    balanceCache.has(
+      cacheKey
+    )
   ) {
     return balanceCache.get(
       cacheKey
@@ -398,707 +427,310 @@ async function getBalance(
   address,
   block = "latest"
 ) {
-  return rawToNumber(
+  const raw =
     await getBalanceRaw(
       address,
       block
-    )
-  );
-}
-
-
-// ============================================================
-// BLOCK ESTIMATION
-// ============================================================
-
-function blocksForSeconds(seconds) {
-  return (
-    seconds /
-    APPROX_BLOCK_SECONDS
-  );
-}
-
-
-function blockAgo(
-  currentBlock,
-  secondsAgo
-) {
-  const blocksAgo =
-    blocksForSeconds(
-      secondsAgo
     );
 
-  if (
-    currentBlock >
-    blocksAgo
-  ) {
-    return (
-      currentBlock -
-      blocksAgo
-    );
-  }
-
-  return 0n;
-}
-
-
-function estimatedDaysBetween(
-  startBlock,
-  endBlock
-) {
-  if (
-    endBlock <=
-    startBlock
-  ) {
-    return 0;
-  }
-
-  const blocks =
-    endBlock -
-    startBlock;
-
-  const seconds =
-    blocks *
-    APPROX_BLOCK_SECONDS;
-
-  return (
-    Number(seconds) /
-    86400
-  );
+  return rawToNumber(raw);
 }
 
 
 // ============================================================
-// LOG QUERY
+// REAL BLOCK TIMESTAMPS
+// ============================================================
+//
+// Instead of assuming Base always produces exactly one block
+// every X seconds, find the historical block by timestamp.
+//
+// This makes 7D / 30D / 1Y considerably more accurate.
 // ============================================================
 
-async function getLogs(
-  filter
+async function getBlock(
+  block
 ) {
   return rpc(
-    "eth_getLogs",
-    [filter]
+    "eth_getBlockByNumber",
+    [
+      typeof block === "bigint"
+        ? blockTag(block)
+        : block,
+      false
+    ]
   );
 }
 
 
-// Query logs in smaller chunks.
-// This avoids giant requests and keeps Alchemy happier.
-async function getLogsChunked(
-  baseFilter,
-  fromBlock,
-  toBlock,
-  chunkSize = 500000n
+async function getBlockTimestamp(
+  block
 ) {
-  if (
-    fromBlock >
-    toBlock
-  ) {
-    return [];
-  }
+  const data =
+    await getBlock(block);
 
-  const allLogs = [];
-
-  let start =
-    fromBlock;
-
-  while (
-    start <=
-    toBlock
-  ) {
-    let end =
-      start +
-      chunkSize -
-      1n;
-
-    if (
-      end >
-      toBlock
-    ) {
-      end =
-        toBlock;
-    }
-
-    const logs =
-      await getLogs({
-        ...baseFilter,
-
-        fromBlock:
-          blockTag(start),
-
-        toBlock:
-          blockTag(end)
-      });
-
-    allLogs.push(
-      ...logs
+  if (!data) {
+    throw new Error(
+      "Unable to read block."
     );
-
-    start =
-      end + 1n;
   }
 
-  return allLogs;
+  return BigInt(
+    data.timestamp
+  );
 }
 
 
-// ============================================================
-// BENCHMARK START DISCOVERY
-// ============================================================
+// Find approximately the first block at or after
+// a requested Unix timestamp using binary search.
 
-async function findBenchmarkSeedBlock(
-  currentBlock
+async function findBlockAtTimestamp(
+  targetTimestamp,
+  highBlock
 ) {
-  if (
-    RESTORED_START_BLOCK >
-    0n
-  ) {
-    return RESTORED_START_BLOCK;
-  }
+  let low = 1n;
 
-  const scanSeconds =
-    AUTO_SEED_SCAN_DAYS *
-    24n *
-    60n *
-    60n;
-
-  const oldestBlock =
-    blockAgo(
-      currentBlock,
-      scanSeconds
-    );
-
-  const targetTopic =
-    addressTopic(
-      REFERENCE_WALLET
-    );
-
-  // Search forwards in manageable chunks.
-  // Once we find an incoming benchmark transfer,
-  // that becomes the temporary test baseline.
-  const chunkSize =
-    300000n;
-
-  let start =
-    oldestBlock;
-
-  let earliest =
-    null;
+  let high =
+    highBlock;
 
   while (
-    start <=
-    currentBlock
+    low < high
   ) {
-    let end =
-      start +
-      chunkSize -
-      1n;
+    const mid =
+      (low + high) /
+      2n;
 
-    if (
-      end >
-      currentBlock
-    ) {
-      end =
-        currentBlock;
-    }
-
-    const logs =
-      await getLogs({
-        address:
-          TOKEN_ADDRESS,
-
-        fromBlock:
-          blockTag(start),
-
-        toBlock:
-          blockTag(end),
-
-        topics: [
-          TRANSFER_TOPIC,
-          null,
-          targetTopic
-        ]
-      });
-
-    if (
-      logs &&
-      logs.length
-    ) {
-      logs.sort(
-        (a, b) => {
-          const aa =
-            BigInt(
-              a.blockNumber
-            );
-
-          const bb =
-            BigInt(
-              b.blockNumber
-            );
-
-          if (aa < bb) {
-            return -1;
-          }
-
-          if (aa > bb) {
-            return 1;
-          }
-
-          return 0;
-        }
+    const midTimestamp =
+      await getBlockTimestamp(
+        mid
       );
 
-      earliest =
-        BigInt(
-          logs[0].blockNumber
-        );
-
-      break;
+    if (
+      midTimestamp <
+      targetTimestamp
+    ) {
+      low =
+        mid + 1n;
+    } else {
+      high =
+        mid;
     }
-
-    start =
-      end + 1n;
   }
 
-  if (
-    earliest === null
-  ) {
-    throw new Error(
-      "Benchmark seed transfer not found."
-    );
-  }
-
-  return earliest;
+  return low;
 }
 
 
 // ============================================================
-// GLOBAL REFLECTION APR
+// ALCHEMY TRANSFERS API
+// ============================================================
+//
+// This replaces eth_getLogs completely.
+//
+// Alchemy directly tells us which ERC20 transfers involved
+// the requested wallet.
 // ============================================================
 
-function annualise(
-  returnFraction,
-  days
+function isAltitudeTransfer(
+  transfer
 ) {
-  if (
-    days <= 0
-  ) {
-    return 0;
+  const contract =
+    transfer?.rawContract
+      ?.address;
+
+  if (!contract) {
+    return false;
   }
 
   return (
-    returnFraction *
-    (365 / days) *
-    100
+    contract.toLowerCase() ===
+    TOKEN_ADDRESS
   );
 }
 
 
-async function calculateBenchmarkApr(
-  startBlock,
-  endBlock,
-  days
-) {
-  const [
-    startBalance,
-    endBalance
-  ] =
-    await Promise.all([
-      getBalance(
-        REFERENCE_WALLET,
-        startBlock
-      ),
+// Fetch ONE direction:
+//
+// incoming:
+//   toAddress = wallet
+//
+// outgoing:
+//   fromAddress = wallet
+//
+// Alchemy can paginate large histories using pageKey.
 
-      getBalance(
-        REFERENCE_WALLET,
-        endBlock
-      )
-    ]);
-
-  if (
-    startBalance <= 0
-  ) {
-    throw new Error(
-      "Benchmark start balance is zero."
-    );
-  }
-
-  const returnFraction =
-    (
-      endBalance /
-      startBalance
-    ) - 1;
-
-  return annualise(
-    returnFraction,
-    days
-  );
-}
-
-
-async function loadGlobalApr() {
-  setStatus(
-    "globalStatus",
-    "Reading reflection benchmark…",
-    "loading"
-  );
-
-  try {
-    const current =
-      await getLatestBlock();
-
-    if (
-      trackingStartBlock ===
-      0n
-    ) {
-      trackingStartBlock =
-        await findBenchmarkSeedBlock(
-          current
-        );
-    }
-
-    const trackerAgeDays =
-      estimatedDaysBetween(
-        trackingStartBlock,
-        current
-      );
-
-    if (
-      RESTORED_START_BLOCK >
-      0n
-    ) {
-      setText(
-        "trackingNotice",
-        "LIVE RESTORED TRACKING · Reflection performance is measured from the Restored activation block."
-      );
-    } else {
-      setText(
-        "trackingNotice",
-        "TEST TRACKING · The benchmark wallet is being used as the temporary reflection baseline. At Restored launch this will be replaced by the exact activation block."
-      );
-    }
-
-    // --------------------------------------------------------
-    // SINCE TRACKER STARTED
-    // --------------------------------------------------------
-
-    const [
-      startBalance,
-      currentBalance
-    ] =
-      await Promise.all([
-        getBalance(
-          REFERENCE_WALLET,
-          trackingStartBlock
-        ),
-
-        getBalance(
-          REFERENCE_WALLET,
-          current
-        )
-      ]);
-
-    let sinceApr = 0;
-
-    if (
-      startBalance > 0 &&
-      trackerAgeDays > 0
-    ) {
-      const growth =
-        (
-          currentBalance /
-          startBalance
-        ) - 1;
-
-      sinceApr =
-        annualise(
-          growth,
-          trackerAgeDays
-        );
-    }
-
-    setText(
-      "aprMain",
-      formatPercent(
-        sinceApr
-      )
-    );
-
-    setText(
-      "aprMainLabel",
-      "Annualised Since Tracker Started"
-    );
-
-
-    // --------------------------------------------------------
-    // 7 DAYS
-    // --------------------------------------------------------
-
-    if (
-      trackerAgeDays >= 7
-    ) {
-      const start7 =
-        blockAgo(
-          current,
-          7n *
-          24n *
-          60n *
-          60n
-        );
-
-      const apr7 =
-        await calculateBenchmarkApr(
-          start7,
-          current,
-          7
-        );
-
-      setText(
-        "apr7d",
-        formatPercent(
-          apr7
-        )
-      );
-    } else {
-      setText(
-        "apr7d",
-        "Collecting data"
-      );
-    }
-
-
-    // --------------------------------------------------------
-    // 30 DAYS
-    // --------------------------------------------------------
-
-    if (
-      trackerAgeDays >= 30
-    ) {
-      const start30 =
-        blockAgo(
-          current,
-          30n *
-          24n *
-          60n *
-          60n
-        );
-
-      const apr30 =
-        await calculateBenchmarkApr(
-          start30,
-          current,
-          30
-        );
-
-      setText(
-        "apr30d",
-        formatPercent(
-          apr30
-        )
-      );
-
-      // Once we have a genuine 30-day period,
-      // make that the headline number.
-      setText(
-        "aprMain",
-        formatPercent(
-          apr30
-        )
-      );
-
-      setText(
-        "aprMainLabel",
-        "30 Day Reflection APR"
-      );
-    } else {
-      setText(
-        "apr30d",
-        "Collecting data"
-      );
-    }
-
-
-    // --------------------------------------------------------
-    // 1 YEAR
-    // --------------------------------------------------------
-
-    if (
-      trackerAgeDays >= 365
-    ) {
-      const startYear =
-        blockAgo(
-          current,
-          365n *
-          24n *
-          60n *
-          60n
-        );
-
-      const aprYear =
-        await calculateBenchmarkApr(
-          startYear,
-          current,
-          365
-        );
-
-      setText(
-        "apr1y",
-        formatPercent(
-          aprYear
-        )
-      );
-    } else {
-      setText(
-        "apr1y",
-        "Collecting data"
-      );
-    }
-
-    setStatus(
-      "globalStatus",
-      `Benchmark active for approximately ${trackerAgeDays.toFixed(1)} days.`,
-      "success"
-    );
-
-  } catch (error) {
-    console.error(
-      "Global APR error:",
-      error
-    );
-
-    setText(
-      "aprMain",
-      "Unavailable"
-    );
-
-    setText(
-      "aprMainLabel",
-      "Reflection history unavailable"
-    );
-
-    setText(
-      "apr7d",
-      "—"
-    );
-
-    setText(
-      "apr30d",
-      "—"
-    );
-
-    setText(
-      "apr1y",
-      "—"
-    );
-
-    setStatus(
-      "globalStatus",
-      error.message ||
-      "Unable to read reflection benchmark.",
-      "error"
-    );
-  }
-}
-
-
-// ============================================================
-// WALLET TRANSFER HISTORY
-// ============================================================
-
-async function getWalletTransfers(
+async function fetchTransferDirection(
   address,
-  fromBlock,
-  toBlock
+  direction,
+  fromBlock = "0x0",
+  toBlock = "latest"
 ) {
-  const topic =
-    addressTopic(address);
+  let pageKey = null;
 
-  const incomingFilter = {
-    address:
-      TOKEN_ADDRESS,
+  const collected = [];
 
-    topics: [
-      TRANSFER_TOPIC,
-      null,
-      topic
-    ]
-  };
+  do {
+    const request = {
+      fromBlock:
+        typeof fromBlock ===
+        "bigint"
+          ? blockTag(fromBlock)
+          : fromBlock,
 
-  const outgoingFilter = {
-    address:
-      TOKEN_ADDRESS,
+      toBlock:
+        typeof toBlock ===
+        "bigint"
+          ? blockTag(toBlock)
+          : toBlock,
 
-    topics: [
-      TRANSFER_TOPIC,
-      topic
-    ]
-  };
+      category: [
+        "erc20"
+      ],
 
-  // Run them sequentially rather than blasting RPC concurrently.
+      withMetadata: false,
+
+      excludeZeroValue: false,
+
+      maxCount: "0x3e8"
+    };
+
+
+    if (
+      direction ===
+      "incoming"
+    ) {
+      request.toAddress =
+        address;
+    } else {
+      request.fromAddress =
+        address;
+    }
+
+
+    if (pageKey) {
+      request.pageKey =
+        pageKey;
+    }
+
+
+    const result =
+      await rpc(
+        "alchemy_getAssetTransfers",
+        [request]
+      );
+
+
+    const transfers =
+      result?.transfers ||
+      [];
+
+
+    for (
+      const transfer of
+      transfers
+    ) {
+      if (
+        isAltitudeTransfer(
+          transfer
+        )
+      ) {
+        collected.push(
+          transfer
+        );
+      }
+    }
+
+
+    pageKey =
+      result?.pageKey ||
+      null;
+
+  } while (pageKey);
+
+
+  return collected;
+}
+
+
+// Fetch both incoming and outgoing ALT transfers
+// for one wallet.
+
+async function getAltitudeTransfers(
+  address,
+  fromBlock = "0x0",
+  toBlock = "latest"
+) {
+  // Sequential deliberately:
+  // we don't need to burst the free RPC.
+
   const incoming =
-    await getLogsChunked(
-      incomingFilter,
+    await fetchTransferDirection(
+      address,
+      "incoming",
       fromBlock,
       toBlock
     );
+
 
   const outgoing =
-    await getLogsChunked(
-      outgoingFilter,
+    await fetchTransferDirection(
+      address,
+      "outgoing",
       fromBlock,
       toBlock
     );
+
 
   const unique =
     new Map();
 
+
   for (
-    const log of
-    incoming.concat(outgoing)
+    const transfer of
+    incoming.concat(
+      outgoing
+    )
   ) {
     const key =
+      transfer.uniqueId ||
       (
-        log.transactionHash ||
-        ""
-      ) +
-      ":" +
-      (
-        log.logIndex ||
-        ""
+        transfer.hash +
+        ":" +
+        transfer.blockNum +
+        ":" +
+        transfer.from +
+        ":" +
+        transfer.to
       );
+
 
     unique.set(
       key,
-      log
+      transfer
     );
   }
 
-  const logs =
+
+  const transfers =
     [...unique.values()];
 
-  logs.sort(
+
+  transfers.sort(
     (a, b) => {
-      const blockA =
+      const aa =
         BigInt(
-          a.blockNumber
+          a.blockNum
         );
 
-      const blockB =
+      const bb =
         BigInt(
-          b.blockNumber
+          b.blockNum
         );
 
-      if (
-        blockA <
-        blockB
-      ) {
+      if (aa < bb) {
         return -1;
       }
 
-      if (
-        blockA >
-        blockB
-      ) {
+      if (aa > bb) {
         return 1;
       }
 
@@ -1106,28 +738,32 @@ async function getWalletTransfers(
     }
   );
 
-  return logs;
+
+  return transfers;
 }
 
 
-function uniqueActivityBlocks(
-  logs
+function activityBlocksFromTransfers(
+  transfers
 ) {
-  const set =
+  const unique =
     new Set();
 
+
   for (
-    const log of logs
+    const transfer of
+    transfers
   ) {
-    set.add(
+    unique.add(
       BigInt(
-        log.blockNumber
+        transfer.blockNum
       ).toString()
     );
   }
 
+
   return (
-    [...set]
+    [...unique]
       .map(
         value =>
           BigInt(value)
@@ -1145,14 +781,581 @@ function uniqueActivityBlocks(
 
 
 // ============================================================
+// FIND BENCHMARK SEED
+// ============================================================
+//
+// No log scanning.
+//
+// Ask Alchemy:
+// "Show me ERC20 transfers TO this benchmark wallet."
+//
+// Then find the first ALT transfer.
+// ============================================================
+
+async function findBenchmarkSeedBlock() {
+  if (
+    RESTORED_START_BLOCK >
+    0n
+  ) {
+    return RESTORED_START_BLOCK;
+  }
+
+
+  const transfers =
+    await fetchTransferDirection(
+      REFERENCE_WALLET,
+      "incoming",
+      "0x0",
+      "latest"
+    );
+
+
+  if (
+    !transfers.length
+  ) {
+    throw new Error(
+      "Benchmark ALT seed transfer not found."
+    );
+  }
+
+
+  transfers.sort(
+    (a, b) => {
+      const aa =
+        BigInt(
+          a.blockNum
+        );
+
+      const bb =
+        BigInt(
+          b.blockNum
+        );
+
+      return (
+        aa < bb
+          ? -1
+          : aa > bb
+            ? 1
+            : 0
+      );
+    }
+  );
+
+
+  return BigInt(
+    transfers[0].blockNum
+  );
+}
+
+
+// ============================================================
+// ENSURE BENCHMARK HAS NOT BEEN CONTAMINATED
+// ============================================================
+//
+// The benchmark wallet should receive its original seed,
+// then never intentionally send/receive ALT again.
+//
+// Reflections themselves do NOT create Transfer events.
+// ============================================================
+
+async function checkBenchmarkClean(
+  startBlock,
+  endBlock
+) {
+  const afterSeed =
+    startBlock + 1n;
+
+
+  if (
+    afterSeed >
+    endBlock
+  ) {
+    return true;
+  }
+
+
+  const transfers =
+    await getAltitudeTransfers(
+      REFERENCE_WALLET,
+      afterSeed,
+      endBlock
+    );
+
+
+  if (
+    transfers.length >
+    0
+  ) {
+    throw new Error(
+      "Benchmark wallet has had an ALT transfer since tracking began. APR paused to protect accuracy."
+    );
+  }
+
+
+  return true;
+}
+
+
+// ============================================================
+// TRACKER INITIALISATION
+// ============================================================
+
+async function ensureTrackingStart() {
+  if (
+    trackingStartBlock >
+    0n
+  ) {
+    return trackingStartBlock;
+  }
+
+
+  trackingStartBlock =
+    await findBenchmarkSeedBlock();
+
+
+  return trackingStartBlock;
+}
+
+
+// ============================================================
+// APR MATHS
+// ============================================================
+
+function annualiseSimple(
+  returnFraction,
+  elapsedDays
+) {
+  if (
+    elapsedDays <= 0
+  ) {
+    return 0;
+  }
+
+
+  return (
+    returnFraction *
+    (
+      365 /
+      elapsedDays
+    ) *
+    100
+  );
+}
+
+
+function daysBetweenTimestamps(
+  startTimestamp,
+  endTimestamp
+) {
+  return (
+    Number(
+      endTimestamp -
+      startTimestamp
+    ) /
+    86400
+  );
+}
+
+
+async function benchmarkAprBetween(
+  startBlock,
+  endBlock
+) {
+  const [
+    startBalance,
+    endBalance,
+    startTimestamp,
+    endTimestamp
+  ] =
+    await Promise.all([
+      getBalance(
+        REFERENCE_WALLET,
+        startBlock
+      ),
+
+      getBalance(
+        REFERENCE_WALLET,
+        endBlock
+      ),
+
+      getBlockTimestamp(
+        startBlock
+      ),
+
+      getBlockTimestamp(
+        endBlock
+      )
+    ]);
+
+
+  if (
+    startBalance <= 0
+  ) {
+    throw new Error(
+      "Benchmark start balance is zero."
+    );
+  }
+
+
+  const elapsedDays =
+    daysBetweenTimestamps(
+      startTimestamp,
+      endTimestamp
+    );
+
+
+  const returnFraction =
+    (
+      endBalance /
+      startBalance
+    ) - 1;
+
+
+  return {
+    apr:
+      annualiseSimple(
+        returnFraction,
+        elapsedDays
+      ),
+
+    returnPct:
+      returnFraction *
+      100,
+
+    days:
+      elapsedDays,
+
+    startBalance,
+
+    endBalance
+  };
+}
+
+
+// ============================================================
+// GLOBAL APR
+// ============================================================
+
+async function loadGlobalApr() {
+  try {
+    setStatus(
+      "globalStatus",
+      "Reading reflection benchmark…",
+      "loading"
+    );
+
+
+    const current =
+      await getLatestBlock();
+
+
+    const start =
+      await ensureTrackingStart();
+
+
+    // Make sure somebody has not transferred ALT into or
+    // out of the benchmark wallet after the initial seed.
+
+    await checkBenchmarkClean(
+      start,
+      current
+    );
+
+
+    const [
+      currentTimestamp,
+      startTimestamp
+    ] =
+      await Promise.all([
+        getBlockTimestamp(
+          current
+        ),
+
+        getBlockTimestamp(
+          start
+        )
+      ]);
+
+
+    const trackerAgeDays =
+      daysBetweenTimestamps(
+        startTimestamp,
+        currentTimestamp
+      );
+
+
+    if (
+      RESTORED_START_BLOCK >
+      0n
+    ) {
+      setText(
+        "trackingNotice",
+        "LIVE RESTORED TRACKING · Reflection performance is measured from the Restored activation block."
+      );
+    } else {
+      setText(
+        "trackingNotice",
+        "TEST TRACKING · The untouched 100 ALT benchmark wallet is measuring live reflection performance."
+      );
+    }
+
+
+    // ========================================================
+    // SINCE TRACKER START
+    // ========================================================
+
+    const since =
+      await benchmarkAprBetween(
+        start,
+        current
+      );
+
+
+    setText(
+      "aprMain",
+      formatPercent(
+        since.apr
+      )
+    );
+
+
+    setText(
+      "aprMainLabel",
+      RESTORED_START_BLOCK >
+        0n
+        ? "Annualised Since Restored"
+        : "Annualised Since Tracker Started"
+    );
+
+
+    // ========================================================
+    // 7 DAY APR
+    // ========================================================
+
+    if (
+      trackerAgeDays >=
+      7
+    ) {
+      const timestamp7 =
+        currentTimestamp -
+        (
+          7n *
+          86400n
+        );
+
+
+      const block7 =
+        await findBlockAtTimestamp(
+          timestamp7,
+          current
+        );
+
+
+      const result7 =
+        await benchmarkAprBetween(
+          block7,
+          current
+        );
+
+
+      setText(
+        "apr7d",
+        formatPercent(
+          result7.apr
+        )
+      );
+
+    } else {
+      setText(
+        "apr7d",
+        "Collecting data"
+      );
+    }
+
+
+    // ========================================================
+    // 30 DAY APR
+    // ========================================================
+
+    if (
+      trackerAgeDays >=
+      30
+    ) {
+      const timestamp30 =
+        currentTimestamp -
+        (
+          30n *
+          86400n
+        );
+
+
+      const block30 =
+        await findBlockAtTimestamp(
+          timestamp30,
+          current
+        );
+
+
+      const result30 =
+        await benchmarkAprBetween(
+          block30,
+          current
+        );
+
+
+      setText(
+        "apr30d",
+        formatPercent(
+          result30.apr
+        )
+      );
+
+
+      // Once genuine 30-day data exists,
+      // make that the headline APR.
+
+      setText(
+        "aprMain",
+        formatPercent(
+          result30.apr
+        )
+      );
+
+
+      setText(
+        "aprMainLabel",
+        "30 Day Reflection APR"
+      );
+
+    } else {
+      setText(
+        "apr30d",
+        "Collecting data"
+      );
+    }
+
+
+    // ========================================================
+    // 1 YEAR APR
+    // ========================================================
+
+    if (
+      trackerAgeDays >=
+      365
+    ) {
+      const timestamp1y =
+        currentTimestamp -
+        (
+          365n *
+          86400n
+        );
+
+
+      const block1y =
+        await findBlockAtTimestamp(
+          timestamp1y,
+          current
+        );
+
+
+      const result1y =
+        await benchmarkAprBetween(
+          block1y,
+          current
+        );
+
+
+      setText(
+        "apr1y",
+        formatPercent(
+          result1y.apr
+        )
+      );
+
+    } else {
+      setText(
+        "apr1y",
+        "Collecting data"
+      );
+    }
+
+
+    setStatus(
+      "globalStatus",
+      `Benchmark active for ${trackerAgeDays.toFixed(1)} days.`,
+      "success"
+    );
+
+  } catch (error) {
+    console.error(
+      "Global APR error:",
+      error
+    );
+
+
+    setText(
+      "aprMain",
+      "Unavailable"
+    );
+
+
+    setText(
+      "aprMainLabel",
+      "Reflection history unavailable"
+    );
+
+
+    setText(
+      "apr7d",
+      "—"
+    );
+
+
+    setText(
+      "apr30d",
+      "—"
+    );
+
+
+    setText(
+      "apr1y",
+      "—"
+    );
+
+
+    setStatus(
+      "globalStatus",
+      error.message ||
+      "Unable to calculate reflection APR.",
+      "error"
+    );
+  }
+}
+
+
+// ============================================================
 // PERSONAL REFLECTION CALCULATION
+// ============================================================
+//
+// Principle:
+//
+// 1. Get user's ALT transaction blocks from Alchemy.
+//
+// 2. Between user transactions, their ALT balance can only
+//    change through reflections.
+//
+// 3. Use the untouched benchmark wallet to measure the
+//    reflection growth factor for that period.
+//
+// 4. Reset the user's balance at every transaction block,
+//    preventing buys/sells/transfers being counted as rewards.
 // ============================================================
 
 async function calculateReflections(
   address,
   startBlock,
   endBlock,
-  allActivityBlocks
+  activityBlocks
 ) {
   if (
     startBlock >=
@@ -1161,8 +1364,9 @@ async function calculateReflections(
     return 0;
   }
 
-  const relevantBlocks =
-    allActivityBlocks.filter(
+
+  const relevant =
+    activityBlocks.filter(
       block =>
         block >
           startBlock &&
@@ -1170,14 +1374,17 @@ async function calculateReflections(
           endBlock
     );
 
-  let earned = 0;
+
+  let reflections = 0;
+
 
   let checkpointBlock =
     startBlock;
 
+
   let [
     checkpointUserBalance,
-    checkpointReferenceBalance
+    checkpointBenchmarkBalance
   ] =
     await Promise.all([
       getBalance(
@@ -1192,56 +1399,69 @@ async function calculateReflections(
     ]);
 
 
-  // ----------------------------------------------------------
-  // Each wallet transfer becomes a checkpoint.
-  //
-  // Balance growth between checkpoints is treated as reflections.
-  // The actual buy/sell/transfer itself is excluded.
-  // ----------------------------------------------------------
+  // ==========================================================
+  // PROCESS EACH USER TRANSACTION BLOCK
+  // ==========================================================
 
   for (
-    const activityBlock
-    of relevantBlocks
+    const activityBlock of
+    relevant
   ) {
     const beforeBlock =
-      activityBlock > 0n
+      activityBlock >
+        0n
         ? activityBlock - 1n
         : activityBlock;
 
+
+    // --------------------------------------------------------
+    // Passive reflection period before transaction
+    // --------------------------------------------------------
+
     if (
       beforeBlock >
-      checkpointBlock
+      checkpointBlock &&
+      checkpointUserBalance >
+        0 &&
+      checkpointBenchmarkBalance >
+        0
     ) {
-      const beforeReference =
+      const benchmarkBefore =
         await getBalance(
           REFERENCE_WALLET,
           beforeBlock
         );
 
-      if (
-        checkpointUserBalance >
-          0 &&
-        checkpointReferenceBalance >
-          0 &&
-        beforeReference >=
-          checkpointReferenceBalance
-      ) {
-        const growthFactor =
-          beforeReference /
-          checkpointReferenceBalance;
 
-        earned +=
+      const growthFactor =
+        benchmarkBefore /
+        checkpointBenchmarkBalance;
+
+
+      if (
+        growthFactor >= 1
+      ) {
+        reflections +=
           checkpointUserBalance *
           (
-            growthFactor - 1
+            growthFactor -
+            1
           );
       }
     }
 
-    // Reset balances after the user's transaction.
+
+    // --------------------------------------------------------
+    // Transaction happened.
+    //
+    // Reset to actual balances at the end of this block.
+    // Therefore the transfer itself is NOT counted as a
+    // reflection reward.
+    // --------------------------------------------------------
+
     [
       checkpointUserBalance,
-      checkpointReferenceBalance
+      checkpointBenchmarkBalance
     ] =
       await Promise.all([
         getBalance(
@@ -1255,87 +1475,105 @@ async function calculateReflections(
         )
       ]);
 
+
     checkpointBlock =
       activityBlock;
   }
 
 
-  // ----------------------------------------------------------
-  // Final segment from last wallet activity → current block
-  // ----------------------------------------------------------
+  // ==========================================================
+  // FINAL PASSIVE PERIOD → CURRENT BLOCK
+  // ==========================================================
 
   if (
     endBlock >
-    checkpointBlock
+      checkpointBlock &&
+    checkpointUserBalance >
+      0 &&
+    checkpointBenchmarkBalance >
+      0
   ) {
-    const finalReference =
+    const benchmarkEnd =
       await getBalance(
         REFERENCE_WALLET,
         endBlock
       );
 
-    if (
-      checkpointUserBalance >
-        0 &&
-      checkpointReferenceBalance >
-        0 &&
-      finalReference >=
-        checkpointReferenceBalance
-    ) {
-      const growthFactor =
-        finalReference /
-        checkpointReferenceBalance;
 
-      earned +=
+    const growthFactor =
+      benchmarkEnd /
+      checkpointBenchmarkBalance;
+
+
+    if (
+      growthFactor >=
+      1
+    ) {
+      reflections +=
         checkpointUserBalance *
         (
-          growthFactor - 1
+          growthFactor -
+          1
         );
     }
   }
 
+
   return Math.max(
-    0,
-    earned
+    reflections,
+    0
   );
 }
 
 
 // ============================================================
-// LOAD CONNECTED WALLET HISTORY
+// PERSONAL WALLET HISTORY
 // ============================================================
 
 async function loadWalletHistory(
   address
 ) {
   try {
-    if (
-      trackingStartBlock ===
-      0n
-    ) {
-      setStatus(
-        "walletStatus",
-        "Waiting for reflection tracker baseline…",
-        "loading"
-      );
+    setStatus(
+      "walletStatus",
+      "Loading your ALT activity…",
+      "loading"
+    );
 
-      const current =
-        await getLatestBlock();
-
-      trackingStartBlock =
-        await findBenchmarkSeedBlock(
-          current
-        );
-    }
 
     const current =
       await getLatestBlock();
 
+
+    const trackerStart =
+      await ensureTrackingStart();
+
+
+    const [
+      currentTimestamp,
+      trackerStartTimestamp
+    ] =
+      await Promise.all([
+        getBlockTimestamp(
+          current
+        ),
+
+        getBlockTimestamp(
+          trackerStart
+        )
+      ]);
+
+
     const trackerAgeDays =
-      estimatedDaysBetween(
-        trackingStartBlock,
-        current
+      daysBetweenTimestamps(
+        trackerStartTimestamp,
+        currentTimestamp
       );
+
+
+    // ========================================================
+    // GET USER'S ALT TRANSACTIONS ONCE
+    // ========================================================
 
     setStatus(
       "walletStatus",
@@ -1343,86 +1581,95 @@ async function loadWalletHistory(
       "loading"
     );
 
-    // --------------------------------------------------------
-    // One transfer-history query.
-    // Reuse these activity blocks for all reflection periods.
-    // --------------------------------------------------------
 
-    const logs =
-      await getWalletTransfers(
+    const transfers =
+      await getAltitudeTransfers(
         address,
-        trackingStartBlock,
+        trackerStart,
         current
       );
 
+
     const activityBlocks =
-      uniqueActivityBlocks(
-        logs
+      activityBlocksFromTransfers(
+        transfers
       );
 
 
-    // --------------------------------------------------------
-    // SINCE TRACKER START
-    // --------------------------------------------------------
+    // ========================================================
+    // SINCE RESTORED / TRACKER START
+    // ========================================================
 
     setText(
       "userLifetime",
       "Calculating…"
     );
 
-    const lifetime =
+
+    const sinceStart =
       await calculateReflections(
         address,
-        trackingStartBlock,
+        trackerStart,
         current,
         activityBlocks
       );
+
 
     setText(
       "userLifetime",
       "+" +
       formatAlt(
-        lifetime
+        sinceStart
       )
     );
 
 
-    // --------------------------------------------------------
-    // 7 DAYS
-    // --------------------------------------------------------
+    // ========================================================
+    // LAST 7 DAYS
+    // ========================================================
 
     if (
-      trackerAgeDays >= 7
+      trackerAgeDays >=
+      7
     ) {
       setText(
         "user7d",
         "Calculating…"
       );
 
-      const start7 =
-        blockAgo(
-          current,
+
+      const target7 =
+        currentTimestamp -
+        (
           7n *
-          24n *
-          60n *
-          60n
+          86400n
         );
 
-      const earned7 =
+
+      const block7 =
+        await findBlockAtTimestamp(
+          target7,
+          current
+        );
+
+
+      const reflections7 =
         await calculateReflections(
           address,
-          start7,
+          block7,
           current,
           activityBlocks
         );
+
 
       setText(
         "user7d",
         "+" +
         formatAlt(
-          earned7
+          reflections7
         )
       );
+
     } else {
       setText(
         "user7d",
@@ -1431,42 +1678,52 @@ async function loadWalletHistory(
     }
 
 
-    // --------------------------------------------------------
-    // 30 DAYS
-    // --------------------------------------------------------
+    // ========================================================
+    // LAST 30 DAYS
+    // ========================================================
 
     if (
-      trackerAgeDays >= 30
+      trackerAgeDays >=
+      30
     ) {
       setText(
         "user30d",
         "Calculating…"
       );
 
-      const start30 =
-        blockAgo(
-          current,
+
+      const target30 =
+        currentTimestamp -
+        (
           30n *
-          24n *
-          60n *
-          60n
+          86400n
         );
 
-      const earned30 =
+
+      const block30 =
+        await findBlockAtTimestamp(
+          target30,
+          current
+        );
+
+
+      const reflections30 =
         await calculateReflections(
           address,
-          start30,
+          block30,
           current,
           activityBlocks
         );
+
 
       setText(
         "user30d",
         "+" +
         formatAlt(
-          earned30
+          reflections30
         )
       );
+
     } else {
       setText(
         "user30d",
@@ -1475,42 +1732,52 @@ async function loadWalletHistory(
     }
 
 
-    // --------------------------------------------------------
-    // 1 YEAR
-    // --------------------------------------------------------
+    // ========================================================
+    // LAST 1 YEAR
+    // ========================================================
 
     if (
-      trackerAgeDays >= 365
+      trackerAgeDays >=
+      365
     ) {
       setText(
         "user1y",
         "Calculating…"
       );
 
-      const startYear =
-        blockAgo(
-          current,
+
+      const target1y =
+        currentTimestamp -
+        (
           365n *
-          24n *
-          60n *
-          60n
+          86400n
         );
 
-      const earnedYear =
+
+      const block1y =
+        await findBlockAtTimestamp(
+          target1y,
+          current
+        );
+
+
+      const reflections1y =
         await calculateReflections(
           address,
-          startYear,
+          block1y,
           current,
           activityBlocks
         );
+
 
       setText(
         "user1y",
         "+" +
         formatAlt(
-          earnedYear
+          reflections1y
         )
       );
+
     } else {
       setText(
         "user1y",
@@ -1521,20 +1788,21 @@ async function loadWalletHistory(
 
     setStatus(
       "walletStatus",
-      `Reflection history calculated using ${activityBlocks.length} wallet activity checkpoint${activityBlocks.length === 1 ? "" : "s"}.`,
+      `Reflection history calculated from ${activityBlocks.length} ALT activity checkpoint${activityBlocks.length === 1 ? "" : "s"}.`,
       "success"
     );
 
   } catch (error) {
     console.error(
-      "Wallet history error:",
+      "Wallet reflection history error:",
       error
     );
+
 
     setStatus(
       "walletStatus",
       error.message ||
-      "Reflection history temporarily unavailable.",
+      "Unable to calculate reflection history.",
       "error"
     );
   }
@@ -1544,37 +1812,44 @@ async function loadWalletHistory(
 // ============================================================
 // FAST CURRENT WALLET BALANCE
 // ============================================================
+//
+// Uses the connected wallet RPC.
+//
+// Therefore even if Alchemy history analytics fails,
+// wallet connect + current ALT balance still works.
+// ============================================================
 
 async function loadCurrentWalletBalance(
   address
 ) {
   try {
-    // This is intentionally independent of the historical APR loader.
-    //
-    // Even if historical RPC analytics fail,
-    // the connected-wallet experience still works.
-
     const data =
       encodeBalanceOf(
         address
       );
 
+
     let raw;
+
 
     if (walletProvider) {
       raw =
         await walletProvider.request({
-          method: "eth_call",
+          method:
+            "eth_call",
 
           params: [
             {
               to:
                 TOKEN_ADDRESS,
+
               data
             },
+
             "latest"
           ]
         });
+
     } else {
       raw =
         await ethCall(
@@ -1583,10 +1858,12 @@ async function loadCurrentWalletBalance(
         );
     }
 
+
     const balance =
       rawToNumber(
         BigInt(raw)
       );
+
 
     setText(
       "walletBalance",
@@ -1598,9 +1875,10 @@ async function loadCurrentWalletBalance(
 
   } catch (error) {
     console.error(
-      "Current balance error:",
+      "Current wallet balance error:",
       error
     );
+
 
     setText(
       "walletBalance",
@@ -1623,11 +1901,13 @@ async function ensureBase() {
     );
   }
 
+
   const chainId =
     await window.ethereum.request({
       method:
         "eth_chainId"
     });
+
 
   if (
     chainId.toLowerCase() ===
@@ -1635,6 +1915,7 @@ async function ensureBase() {
   ) {
     return;
   }
+
 
   try {
     await window.ethereum.request({
@@ -1658,6 +1939,7 @@ async function ensureBase() {
       throw error;
     }
 
+
     await window.ethereum.request({
       method:
         "wallet_addEthereumChain",
@@ -1673,8 +1955,10 @@ async function ensureBase() {
           nativeCurrency: {
             name:
               "Ether",
+
             symbol:
               "ETH",
+
             decimals:
               18
           },
@@ -1710,22 +1994,27 @@ async function connectWallet() {
     return;
   }
 
+
   try {
     setConnectButtons(
       "Connecting…",
       true
     );
 
+
     walletProvider =
       window.ethereum;
 
+
     await ensureBase();
+
 
     const accounts =
       await walletProvider.request({
         method:
           "eth_requestAccounts"
       });
+
 
     if (
       !accounts ||
@@ -1736,8 +2025,10 @@ async function connectWallet() {
       );
     }
 
+
     connectedAddress =
       accounts[0];
+
 
     setText(
       "walletAddress",
@@ -1746,6 +2037,7 @@ async function connectWallet() {
       )
     );
 
+
     setConnectButtons(
       shortAddress(
         connectedAddress
@@ -1753,33 +2045,36 @@ async function connectWallet() {
       false
     );
 
-    // --------------------------------------------------------
-    // FIRST:
-    // show current wallet balance immediately.
-    // --------------------------------------------------------
+
+    // ========================================================
+    // CURRENT BALANCE FIRST
+    // ========================================================
 
     setStatus(
       "walletStatus",
-      "Wallet connected. Loading current ALT balance…",
+      "Wallet connected. Loading ALT balance…",
       "loading"
     );
+
 
     await loadCurrentWalletBalance(
       connectedAddress
     );
 
 
-    // --------------------------------------------------------
-    // SECOND:
-    // historical analytics run separately.
-    // A failure here cannot disconnect the wallet.
-    // --------------------------------------------------------
+    // ========================================================
+    // HISTORY SECOND
+    //
+    // Not awaited deliberately.
+    // Wallet stays responsive while analytics calculates.
+    // ========================================================
 
     setStatus(
       "walletStatus",
-      "Wallet connected. Calculating reflection history…",
+      "Wallet connected. Calculating reflections…",
       "loading"
     );
+
 
     loadWalletHistory(
       connectedAddress
@@ -1791,10 +2086,12 @@ async function connectWallet() {
       error
     );
 
+
     setConnectButtons(
       "Connect Wallet",
       false
     );
+
 
     setStatus(
       "walletStatus",
@@ -1808,7 +2105,7 @@ async function connectWallet() {
 
 
 // ============================================================
-// ACCOUNT CHANGES
+// ACCOUNT CHANGE
 // ============================================================
 
 async function handleAccountsChanged(
@@ -1821,51 +2118,62 @@ async function handleAccountsChanged(
     connectedAddress =
       null;
 
+
     setConnectButtons(
       "Connect Wallet",
       false
     );
+
 
     setText(
       "walletAddress",
       "Wallet not connected"
     );
 
+
     setText(
       "walletBalance",
       "—"
     );
+
 
     setText(
       "user7d",
       "—"
     );
 
+
     setText(
       "user30d",
       "—"
     );
+
 
     setText(
       "user1y",
       "—"
     );
 
+
     setText(
       "userLifetime",
       "—"
     );
+
 
     setStatus(
       "walletStatus",
       "Connect a Base wallet to view your reflection history."
     );
 
+
     return;
   }
 
+
   connectedAddress =
     accounts[0];
+
 
   setText(
     "walletAddress",
@@ -1874,6 +2182,7 @@ async function handleAccountsChanged(
     )
   );
 
+
   setConnectButtons(
     shortAddress(
       connectedAddress
@@ -1881,9 +2190,11 @@ async function handleAccountsChanged(
     false
   );
 
+
   await loadCurrentWalletBalance(
     connectedAddress
   );
+
 
   loadWalletHistory(
     connectedAddress
@@ -1892,19 +2203,23 @@ async function handleAccountsChanged(
 
 
 // ============================================================
-// INITIAL PAGE LOAD
+// INITIALISE
 // ============================================================
 
 async function initialise() {
-  // IMPORTANT:
-  // Bind wallet buttons FIRST.
+  // ==========================================================
+  // CONNECT BUTTONS FIRST
   //
-  // The wallet remains usable even if Alchemy/history fails.
+  // RPC analytics can never block wallet functionality.
+  // ==========================================================
+
   const connect1 =
     $("btnConnect");
 
+
   const connect2 =
     $("btnConnect2");
+
 
   if (connect1) {
     connect1.addEventListener(
@@ -1912,6 +2227,7 @@ async function initialise() {
       connectWallet
     );
   }
+
 
   if (connect2) {
     connect2.addEventListener(
@@ -1921,7 +2237,10 @@ async function initialise() {
   }
 
 
-  // Wallet event listeners also initialise independently.
+  // ==========================================================
+  // WALLET EVENTS
+  // ==========================================================
+
   if (
     window.ethereum &&
     window.ethereum.on
@@ -1930,6 +2249,7 @@ async function initialise() {
       "accountsChanged",
       handleAccountsChanged
     );
+
 
     window.ethereum.on(
       "chainChanged",
@@ -1940,13 +2260,19 @@ async function initialise() {
   }
 
 
-  // Token decimals is a lightweight call.
+  // ==========================================================
+  // LIGHTWEIGHT CONTRACT INITIALISATION
+  // ==========================================================
+
   await getTokenDecimals();
 
 
-  // Start the global reflection dashboard separately.
+  // ==========================================================
+  // GLOBAL APR
   //
-  // DO NOT await it before enabling the wallet.
+  // Runs separately and never blocks wallet interaction.
+  // ==========================================================
+
   loadGlobalApr();
 }
 
@@ -1963,6 +2289,7 @@ if (
     "DOMContentLoaded",
     initialise
   );
+
 } else {
   initialise();
 }
