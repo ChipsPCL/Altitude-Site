@@ -1,5 +1,5 @@
 // app.js — Everest ALT Vault (ALT stake -> ALT rewards) — BASE TEST VERSION
-// Everest Test Vault: 0x42EDDCe0ab1269c8eC614A6bDc2ba16dC8445424
+// Everest Test Vault: 0x058454daD10a8d7cbE1f05e6168d61cc69AF2eaF
 // ALT:                0x90678C02823b21772fa7e91B27EE70490257567B
 
 // ====== CONFIG ======
