@@ -43,8 +43,16 @@ const erc20ABI = [
 let provider;
 let signer;
 let user;
+
+// Write contracts use the connected wallet signer.
 let farm;
 let alt;
+
+// Read contracts use a normal Base RPC so mobile wallets do not have to
+// service a burst of eth_call requests through their injected provider.
+let readProvider;
+let farmRead;
+let altRead;
 
 let tokenDecimals = 18;
 
@@ -329,8 +337,7 @@ async function connect() {
     user =
       await signer.getAddress();
 
-    // Same pattern as the original working USDC dApp:
-    // reads and writes use the connected wallet provider.
+    // Writes go through the connected wallet.
     farm =
       new ethers.Contract(
         FARM_ADDRESS,
@@ -345,9 +352,31 @@ async function connect() {
         signer
       );
 
+    // Reads use a dedicated Base RPC.
+    // This avoids mobile wallets having to service lots
+    // of simultaneous eth_call requests.
+    readProvider =
+      new ethers.JsonRpcProvider(
+        "https://base-rpc.publicnode.com"
+      );
+
+    farmRead =
+      new ethers.Contract(
+        FARM_ADDRESS,
+        farmABI,
+        readProvider
+      );
+
+    altRead =
+      new ethers.Contract(
+        ALT,
+        erc20ABI,
+        readProvider
+      );
+
     tokenDecimals =
       Number(
-        await alt.decimals()
+        await altRead.decimals()
       );
 
     setText(
@@ -397,7 +426,7 @@ async function connect() {
 // ====== REFRESH ======
 async function refresh() {
   if (
-    !farm ||
+    !farmRead ||
     !user
   ) {
     return;
@@ -417,21 +446,20 @@ async function refresh() {
       solvent,
     ] =
       await Promise.all([
-        farm.users(user),
-        farm.pendingRewards(
+        farmRead.users(user),
+        farmRead.pendingRewards(
           user
         ),
-        farm.totalStaked(),
-        alt.balanceOf(user),
-        farm.rewardBalance(),
-        farm.allocatedBalance(),
-        farm.availableRewards(),
-        farm.dailyDripEstimate(),
-        farm.yearlyDripEstimate(),
-        farm.isSolvent(),
+        farmRead.totalStaked(),
+        altRead.balanceOf(user),
+        farmRead.rewardBalance(),
+        farmRead.allocatedBalance(),
+        farmRead.availableRewards(),
+        farmRead.dailyDripEstimate(),
+        farmRead.yearlyDripEstimate(),
+        farmRead.isSolvent(),
       ]);
 
-    // Same named-return style as the old USDC dApp.
     const userStaked =
       u.amount;
 
@@ -600,16 +628,6 @@ async function refresh() {
         )
       );
 
-      // USD-based APR:
-      //
-      // annual reward value in USD
-      // divided by
-      // current total staked value in USD
-      //
-      // Because both stake and reward asset are ALT,
-      // the ALT price mathematically cancels out.
-      // But displaying the USD values makes the APR
-      // easier for users to understand.
       const tvlUsd =
         totalStakedNum * p;
 
@@ -673,7 +691,7 @@ async function refresh() {
       // Price-feed fallback:
       // contract already exposes current APR.
       const aprBps =
-        await farm.currentAprBps();
+        await farmRead.currentAprBps();
 
       setText(
         "apr",
@@ -749,8 +767,14 @@ async function refresh() {
       e
     );
 
+    const msg =
+      e.shortMessage ||
+      e.reason ||
+      e.message ||
+      "Unknown read error";
+
     setStatus(
-      "Refresh failed — check console"
+      `Refresh failed: ${msg}`
     );
   }
 }
