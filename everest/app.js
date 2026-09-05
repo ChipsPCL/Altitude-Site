@@ -512,7 +512,7 @@ async function refresh() {
       fmtUnitsSmart(
         totalStaked,
         tokenDecimals,
-        8
+        2
       );
 
     const dripDayText =
