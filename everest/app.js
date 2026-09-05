@@ -650,7 +650,7 @@ async function refresh() {
       if (apr !== null) {
         setText(
           "aprUsdBasis",
-  "Variable APR based on current reserve and total staked"
+  ""
         );
       } else {
         setText(
