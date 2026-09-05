@@ -650,11 +650,7 @@ async function refresh() {
       if (apr !== null) {
         setText(
           "aprUsdBasis",
-          `${fmtUsd(
-            annualRewardsUsd
-          )}/yr rewards ÷ ${fmtUsd(
-            tvlUsd
-          )} staked`
+  "Variable APR based on current reserve and total staked"
         );
       } else {
         setText(
