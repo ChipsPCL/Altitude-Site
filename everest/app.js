@@ -476,14 +476,14 @@ async function refresh() {
       fmtUnitsSmart(
         userStaked,
         tokenDecimals,
-        8
+        2
       );
 
     const pendingText =
       fmtUnitsSmart(
         pending,
         tokenDecimals,
-        8
+        2
       );
 
     const walletText =
