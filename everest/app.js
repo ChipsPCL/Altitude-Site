@@ -505,7 +505,7 @@ async function refresh() {
       fmtUnitsSmart(
         availableBal,
         tokenDecimals,
-        8
+        2
       );
 
     const totalStakedText =
@@ -519,7 +519,7 @@ async function refresh() {
       fmtUnitsSmart(
         dripDay,
         tokenDecimals,
-        8
+        2
       );
 
     setText(
