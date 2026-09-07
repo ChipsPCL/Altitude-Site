@@ -299,6 +299,10 @@
       align-items: center;
     }
 
+    .withdraw-row {
+      grid-template-columns: 1fr 84px 126px;
+    }
+
     input {
       width: 100%;
       min-height: 42px;
@@ -421,7 +425,8 @@
         padding: 10px;
       }
 
-      .input-row {
+      .input-row,
+      .withdraw-row {
         grid-template-columns: 1fr;
       }
 
@@ -453,7 +458,6 @@
       transform: none !important;
       filter: none !important;
     }
-
   </style>
 </head>
 
@@ -527,7 +531,7 @@
         <div class="stat glass">
           <div class="label">Live APR</div>
           <div class="value" id="apr">-</div>
-          <div class="small" id="aprUsdBasis">USD value basis</div>
+          <div class="small" id="aprUsdBasis"></div>
         </div>
       </section>
 
@@ -560,8 +564,9 @@
         <div class="box glass">
           <h2>Withdraw ALTITUDE</h2>
 
-          <div class="input-row">
-            <input type="number" id="withdrawAmount" placeholder="Amount of ALTITUDE" />
+          <div class="input-row withdraw-row">
+            <input type="text" id="withdrawAmount" inputmode="decimal" placeholder="Amount of ALTITUDE" />
+            <button id="btnWithdrawMax" class="secondary" type="button">MAX</button>
             <button id="btnWithdraw">Withdraw</button>
           </div>
 
