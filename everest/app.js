@@ -56,6 +56,10 @@ let altRead;
 
 let tokenDecimals = 18;
 
+// Exact raw on-chain stake for the connected user.
+// Used by the MAX withdrawal button so a full exit leaves no dust.
+let userStakedRaw = 0n;
+
 let cachedAltPriceUsd = null;
 let lastPriceTs = 0;
 let refreshTimer = null;
@@ -463,6 +467,10 @@ async function refresh() {
     const userStaked =
       u.amount;
 
+    // Store exact raw on-chain stake for MAX withdrawal.
+    userStakedRaw =
+      userStaked;
+
     // ===== USER =====
     const stakedText =
       fmtUnitsSmart(
@@ -650,7 +658,7 @@ async function refresh() {
       if (apr !== null) {
         setText(
           "aprUsdBasis",
-  ""
+          ""
         );
       } else {
         setText(
@@ -684,8 +692,6 @@ async function refresh() {
         "-"
       );
 
-      // Price-feed fallback:
-      // contract already exposes current APR.
       const aprBps =
         await farmRead.currentAprBps();
 
@@ -699,7 +705,7 @@ async function refresh() {
 
       setText(
         "aprUsdBasis",
-        "ALT price temporarily unavailable"
+        ""
       );
     }
 
@@ -804,6 +810,40 @@ async function approveIfNeeded(
   await tx.wait();
 }
 
+// ====== MAX WITHDRAW ======
+function setWithdrawMax() {
+  if (
+    !user ||
+    !farmRead
+  ) {
+    return alert(
+      "Connect wallet first"
+    );
+  }
+
+  if (
+    userStakedRaw <= 0n
+  ) {
+    return alert(
+      "No ALT currently staked"
+    );
+  }
+
+  const input =
+    $("withdrawAmount");
+
+  if (!input) {
+    return;
+  }
+
+  input.value =
+    ethers.formatUnits(
+      userStakedRaw,
+      tokenDecimals
+    );
+}
+
+// ====== DEPOSIT ======
 async function stake() {
   if (
     !farm ||
@@ -876,6 +916,7 @@ async function stake() {
   }
 }
 
+// ====== WITHDRAW ======
 async function withdraw() {
   if (
     !farm ||
@@ -891,7 +932,7 @@ async function withdraw() {
 
   const val =
     input
-      ? input.value
+      ? input.value.trim()
       : "";
 
   if (
@@ -944,6 +985,7 @@ async function withdraw() {
   }
 }
 
+// ====== CLAIM ======
 async function claim() {
   if (
     !farm ||
@@ -983,6 +1025,7 @@ async function claim() {
   }
 }
 
+// ====== UPDATE POOL ======
 async function updatePool() {
   if (
     !farm ||
@@ -1032,6 +1075,9 @@ document.addEventListener(
     const btnDeposit =
       $("btnDeposit");
 
+    const btnWithdrawMax =
+      $("btnWithdrawMax");
+
     const btnWithdraw =
       $("btnWithdraw");
 
@@ -1049,6 +1095,11 @@ document.addEventListener(
     if (btnDeposit) {
       btnDeposit.onclick =
         stake;
+    }
+
+    if (btnWithdrawMax) {
+      btnWithdrawMax.onclick =
+        setWithdrawMax;
     }
 
     if (btnWithdraw) {
