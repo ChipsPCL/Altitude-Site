@@ -267,12 +267,17 @@ async function ensureBase() {
       method: "eth_chainId",
     });
 
-  if (
-    current.toLowerCase() ===
-    "0x2105"
-  ) {
-    return;
-  }
+  const currentChainId =
+  typeof current === "string"
+    ? current.toLowerCase()
+    : String(current);
+
+if (
+  currentChainId === "0x2105" ||
+  currentChainId === "8453"
+) {
+  return;
+}
 
   try {
     await window.ethereum.request({
